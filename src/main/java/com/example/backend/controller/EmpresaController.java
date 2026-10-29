@@ -1,9 +1,5 @@
 package com.example.backend.controller;
 
-import com.example.backend.dto.EmpresaRegistroRequestDTO;
-import com.example.backend.dto.EmpresaResponseDTO;
-import com.example.backend.service.EmpresaService;
-import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,8 +7,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.backend.dto.EmpresaRegistroRequestDTO;
+import com.example.backend.dto.EmpresaResponseDTO;
+import com.example.backend.service.EmpresaService;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/empresas")
+@Tag(name = "Empresas", description = "HU-01: registro de empresas")
 public class EmpresaController {
 
     private final EmpresaService empresaService;
@@ -21,11 +26,9 @@ public class EmpresaController {
         this.empresaService = empresaService;
     }
 
-    // HU-01: Registro de empresa (crea la empresa junto con su usuario administrador inicial)
     @PostMapping("/registro")
-    public ResponseEntity<EmpresaResponseDTO> registrarEmpresa(
-            @Valid @RequestBody EmpresaRegistroRequestDTO request) {
-        EmpresaResponseDTO response = empresaService.registrarEmpresa(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    @Operation(summary = "Registrar una empresa junto con su usuario administrador inicial")
+    public ResponseEntity<EmpresaResponseDTO> registrarEmpresa(@Valid @RequestBody EmpresaRegistroRequestDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(empresaService.registrarEmpresa(request));
     }
 }

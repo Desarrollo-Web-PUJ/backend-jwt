@@ -20,6 +20,8 @@ public class ProcesoDetalleDTO {
 
     private List<EventoMensajeResponseDTO> eventosMensaje;
     private List<FlujoMensajeResponseDTO> flujosMensaje;
+    // Empresa propietaria: permite saber si el proceso es propio o compartido (HU-23)
+    private Long empresaId;
 
     public ProcesoDetalleDTO(
             Long id,
@@ -34,7 +36,8 @@ public class ProcesoDetalleDTO {
             List<GatewayResponseDTO> gateways,
             List<ArcoResponseDTO> arcos,
             List<EventoMensajeResponseDTO> eventosMensaje,
-            List<FlujoMensajeResponseDTO> flujosMensaje) {
+            List<FlujoMensajeResponseDTO> flujosMensaje,
+            Long empresaId) {
 
         this.id = id;
         this.nombre = nombre;
@@ -49,6 +52,7 @@ public class ProcesoDetalleDTO {
         this.arcos = arcos;
         this.eventosMensaje = eventosMensaje;
         this.flujosMensaje = flujosMensaje;
+        this.empresaId = empresaId;
     }
 
     public Long getId() {
@@ -99,5 +103,8 @@ public class ProcesoDetalleDTO {
     }
     public List<FlujoMensajeResponseDTO> getFlujosMensaje() {
         return flujosMensaje;
+    }
+    public Long getEmpresaId() {
+        return empresaId;
     }
 }

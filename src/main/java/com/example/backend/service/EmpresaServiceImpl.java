@@ -1,16 +1,18 @@
 package com.example.backend.service;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.backend.dto.EmpresaRegistroRequestDTO;
 import com.example.backend.dto.EmpresaResponseDTO;
 import com.example.backend.entity.Empresa;
 import com.example.backend.entity.RolUsuario;
 import com.example.backend.entity.Usuario;
 import com.example.backend.exception.RecursoDuplicadoException;
+import com.example.backend.mapper.EmpresaMapper;
 import com.example.backend.repository.EmpresaRepository;
 import com.example.backend.repository.UsuarioRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EmpresaServiceImpl implements EmpresaService {
@@ -18,23 +20,25 @@ public class EmpresaServiceImpl implements EmpresaService {
     private final EmpresaRepository empresaRepository;
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmpresaMapper empresaMapper;
 
-    public EmpresaServiceImpl(EmpresaRepository empresaRepository,
-                               UsuarioRepository usuarioRepository,
-                               PasswordEncoder passwordEncoder) {
+    public EmpresaServiceImpl(
+            EmpresaRepository empresaRepository,
+            UsuarioRepository usuarioRepository,
+            PasswordEncoder passwordEncoder,
+            EmpresaMapper empresaMapper) {
         this.empresaRepository = empresaRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.empresaMapper = empresaMapper;
     }
 
+    // HU-01: la empresa y su administrador inicial se crean en una sola transacción
     @Override
     @Transactional
     public EmpresaResponseDTO registrarEmpresa(EmpresaRegistroRequestDTO request) {
-        String nombre = normalizar(request.getNombre());
-        String nit = normalizar(request.getNit());
-        String correoContacto = normalizar(request.getCorreoContacto());
-        String adminNombre = normalizar(request.getAdminNombre());
-        String adminCorreo = normalizar(request.getAdminCorreo());
+        String nit = request.getNit().trim();
+        String adminCorreo = request.getAdminCorreo().trim().toLowerCase();
 
         if (empresaRepository.existsByNitIgnoreCase(nit)) {
             throw new RecursoDuplicadoException("Ya existe una empresa registrada con ese NIT");
@@ -44,30 +48,20 @@ public class EmpresaServiceImpl implements EmpresaService {
         }
 
         Empresa empresa = new Empresa();
-        empresa.setNombre(nombre);
+        empresa.setNombre(request.getNombre().trim());
         empresa.setNit(nit);
-        empresa.setCorreoContacto(correoContacto);
+        empresa.setCorreoContacto(request.getCorreoContacto().trim());
         empresa = empresaRepository.save(empresa);
 
-        Usuario admin = new Usuario();
-        admin.setNombre(adminNombre);
-        admin.setCorreo(adminCorreo);
-        admin.setPassword(passwordEncoder.encode(request.getAdminPassword()));
-        admin.setRol(RolUsuario.ADMINISTRADOR);
-        admin.setActivo(true);
-        admin.setEmpresa(empresa);
-        admin = usuarioRepository.save(admin);
+        Usuario administrador = new Usuario();
+        administrador.setNombre(request.getAdminNombre().trim());
+        administrador.setCorreo(adminCorreo);
+        administrador.setPassword(passwordEncoder.encode(request.getAdminPassword()));
+        administrador.setRol(RolUsuario.ADMINISTRADOR);
+        administrador.setActivo(true);
+        administrador.setEmpresa(empresa);
+        administrador = usuarioRepository.save(administrador);
 
-        return new EmpresaResponseDTO(
-                empresa.getId(),
-                empresa.getNombre(),
-                empresa.getNit(),
-                empresa.getCorreoContacto(),
-                admin.getId()
-        );
-    }
-
-    private String normalizar(String valor) {
-        return valor == null ? null : valor.trim();
+        return empresaMapper.toDTO(empresa, administrador);
     }
 }

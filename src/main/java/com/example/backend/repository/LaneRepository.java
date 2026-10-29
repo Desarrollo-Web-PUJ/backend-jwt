@@ -8,26 +8,30 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.example.backend.dto.UsoRolProcesoDTO;
 import com.example.backend.entity.Lane;
 
 public interface LaneRepository extends JpaRepository<Lane, Long> {
 
     List<Lane> findByProcesoIdAndActivoTrueOrderByOrdenAsc(Long procesoId);
 
-    // Devuelve filas [rolId, procesoId, procesoNombre] de los procesos
-    // en los que cada rol esta siendo usado por alguna lane activa.
+    // Procesos en los que cada rol está siendo usado por alguna lane activa.
+    // La consulta construye directamente el DTO (proyección por constructor).
     @Query("""
-            SELECT DISTINCT l.rolProceso.id, p.id, p.nombre
+            SELECT DISTINCT new com.example.backend.dto.UsoRolProcesoDTO(
+                l.rolProceso.id, p.id, p.nombre)
             FROM Lane l
             JOIN l.proceso p
             WHERE l.rolProceso.id IN :rolIds
             AND l.activo = true
             ORDER BY p.nombre
             """)
-    List<Object[]> findUsoDeRoles(@Param("rolIds") Collection<Long> rolIds);
+    List<UsoRolProcesoDTO> findUsoDeRoles(@Param("rolIds") Collection<Long> rolIds);
 
-    // NUEVO (HU-22): lanes de un pool, ordenadas
+    // HU-22: lanes de un pool, ordenadas
     List<Lane> findByPoolIdAndActivoTrueOrderByOrdenAsc(Long poolId);
+
+    long countByPoolIdAndActivoTrue(Long poolId);
 
     Optional<Lane> findByIdAndPoolId(Long id, Long poolId);
 

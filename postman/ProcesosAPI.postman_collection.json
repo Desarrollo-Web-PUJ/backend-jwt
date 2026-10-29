@@ -1,0 +1,1389 @@
+{
+  "info": {
+    "name": "Editor de procesos - API REST",
+    "description": "Recorre la API completa en orden: registra una empresa, inicia sesión y modela el proceso de solicitud de vacaciones del enunciado. Ejecútela con el Collection Runner (en orden). Postman conserva la cookie JSESSIONID entre peticiones.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Empresas y sesión (HU-01 a HU-03)",
+      "item": [
+        {
+          "name": "Registrar empresa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/empresas/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "empresas",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Empresa Demo {{sufijo}}\",\n  \"nit\": \"900{{sufijo}}\",\n  \"correoContacto\": \"contacto{{sufijo}}@demo.com\",\n  \"adminNombre\": \"Ana Administradora\",\n  \"adminCorreo\": \"admin{{sufijo}}@demo.com\",\n  \"adminPassword\": \"Clave12345\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Devuelve el administrador inicial', () => pm.expect(pm.response.json().adminUsuarioId).to.be.a('number'));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('sufijo', Date.now().toString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar empresa con NIT repetido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/empresas/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "empresas",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Otra\",\n  \"nit\": \"900{{sufijo}}\",\n  \"correoContacto\": \"otra{{sufijo}}@demo.com\",\n  \"adminNombre\": \"Otro\",\n  \"adminCorreo\": \"otro{{sufijo}}@demo.com\",\n  \"adminPassword\": \"Clave12345\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Explica el error', () => pm.expect(pm.response.json().mensaje).to.include('NIT'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login con contraseña incorrecta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin{{sufijo}}@demo.com\",\n  \"password\": \"incorrecta\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Mensaje genérico', () => pm.expect(pm.response.json().mensaje).to.eql('Correo o contraseña incorrectos'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin{{sufijo}}@demo.com\",\n  \"password\": \"Clave12345\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol administrador', () => pm.expect(pm.response.json().rol).to.eql('ADMINISTRADOR'));",
+                  "pm.collectionVariables.set('empresaId', pm.response.json().empresaId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sesión actual",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sesion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sesion"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar colaborador editor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/empresas/{{empresaId}}/usuarios/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "empresas",
+                "{{empresaId}}",
+                "usuarios",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Eduardo Editor\",\n  \"correo\": \"editor{{sufijo}}@demo.com\",\n  \"password\": \"Clave12345\",\n  \"rol\": \"EDITOR\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios de la empresa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/empresas/{{empresaId}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "empresas",
+                "{{empresaId}}",
+                "usuarios"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Dos usuarios', () => pm.expect(pm.response.json().length).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Roles de proceso (HU-17 a HU-20)",
+      "item": [
+        {
+          "name": "Crear rol Empleado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles-proceso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles-proceso"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Empleado\",\n  \"descripcion\": \"Quien solicita\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('rolEmpleadoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear rol Jefe inmediato",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles-proceso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles-proceso"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Jefe inmediato\",\n  \"descripcion\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('rolJefeId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear rol con nombre repetido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles-proceso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles-proceso"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"empleado\",\n  \"descripcion\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar roles (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles-proceso?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles-proceso"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Formato paginado', () => { const r = pm.response.json(); pm.expect(r.content).to.be.an('array'); pm.expect(r.totalElements).to.eql(2); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Procesos (HU-04 a HU-07)",
+      "item": [
+        {
+          "name": "Crear proceso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Solicitud de vacaciones\",\n  \"descripcion\": \"Ejemplo del enunciado\",\n  \"categoria\": \"Talento humano\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Nace en borrador', () => pm.expect(pm.response.json().estado).to.eql('BORRADOR'));",
+                  "pm.collectionVariables.set('procesoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear proceso sin nombre",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \" \",\n  \"descripcion\": \"\",\n  \"categoria\": \"X\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar procesos con filtro",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos?page=0&size=10&nombre=vacaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "nombre",
+                  "value": "vacaciones"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Encuentra el proceso', () => pm.expect(pm.response.json().totalElements).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pools del proceso (pool de la empresa ya creado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/pools",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "pools"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('poolEmpresaId', pm.response.json().find(p => p.tipo === 'PROPIO').id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Pools y lanes (HU-21 a HU-24)",
+      "item": [
+        {
+          "name": "Crear pool externo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/pools",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "pools"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Servicio de correo\",\n  \"tipo\": \"EXTERNO\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('poolExternoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Roles disponibles para el pool",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/pools/{{poolEmpresaId}}/roles-disponibles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "pools",
+                "{{poolEmpresaId}}",
+                "roles-disponibles"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear lane Empleado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/pools/{{poolEmpresaId}}/lanes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "pools",
+                "{{poolEmpresaId}}",
+                "lanes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rolProcesoId\": \"{{rolEmpleadoId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('laneEmpleadoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear lane Jefe inmediato",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/pools/{{poolEmpresaId}}/lanes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "pools",
+                "{{poolEmpresaId}}",
+                "lanes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rolProcesoId\": \"{{rolJefeId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('laneJefeId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No se puede eliminar un rol en uso",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles-proceso/{{rolEmpleadoId}}?confirmar=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles-proceso",
+                "{{rolEmpleadoId}}"
+              ],
+              "query": [
+                {
+                  "key": "confirmar",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica dónde se usa', () => pm.expect(pm.response.json().mensaje).to.include('Solicitud de vacaciones'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Actividades, gateways y arcos (HU-08 a HU-16)",
+      "item": [
+        {
+          "name": "Crear actividad Radicar solicitud",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/actividades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "actividades"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Radicar solicitud\",\n  \"tipo\": \"TAREA_USUARIO\",\n  \"laneId\": \"{{laneEmpleadoId}}\",\n  \"posicionX\": 36,\n  \"posicionY\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('actividadRadicarId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear actividad Revisar solicitud",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/actividades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "actividades"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Revisar solicitud\",\n  \"tipo\": \"TAREA_USUARIO\",\n  \"laneId\": \"{{laneJefeId}}\",\n  \"posicionX\": 216,\n  \"posicionY\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('actividadRevisarId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear gateway exclusivo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/gateways",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "gateways"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"EXCLUSIVO\",\n  \"poolId\": \"{{poolEmpresaId}}\",\n  \"posicionX\": 400,\n  \"posicionY\": 195\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('gatewayId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear arco Radicar → Revisar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/arcos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "arcos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoOrigen\": \"ACTIVIDAD\",\n  \"origenId\": \"{{actividadRadicarId}}\",\n  \"tipoDestino\": \"ACTIVIDAD\",\n  \"destinoId\": \"{{actividadRevisarId}}\",\n  \"etiqueta\": null,\n  \"condicion\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('arcoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear arco Revisar → gateway",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/arcos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "arcos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoOrigen\": \"ACTIVIDAD\",\n  \"origenId\": \"{{actividadRevisarId}}\",\n  \"tipoDestino\": \"GATEWAY\",\n  \"destinoId\": \"{{gatewayId}}\",\n  \"etiqueta\": null,\n  \"condicion\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Arco repetido entre los mismos nodos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/arcos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "arcos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoOrigen\": \"ACTIVIDAD\",\n  \"origenId\": \"{{actividadRadicarId}}\",\n  \"tipoDestino\": \"ACTIVIDAD\",\n  \"destinoId\": \"{{actividadRevisarId}}\",\n  \"etiqueta\": null,\n  \"condicion\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Arco de un gateway exclusivo sin condición",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/arcos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "arcos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoOrigen\": \"GATEWAY\",\n  \"origenId\": \"{{gatewayId}}\",\n  \"tipoDestino\": \"ACTIVIDAD\",\n  \"destinoId\": \"{{actividadRadicarId}}\",\n  \"etiqueta\": null,\n  \"condicion\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar arco sin confirmar",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/arcos/{{arcoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "arcos",
+                "{{arcoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Mensajes (HU-25 a HU-28)",
+      "item": [
+        {
+          "name": "Crear Message Throw hacia sistema externo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/eventos-mensaje",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "eventos-mensaje"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"THROW\",\n  \"poolId\": \"{{poolEmpresaId}}\",\n  \"laneId\": \"{{laneJefeId}}\",\n  \"nombreMensaje\": \"NotificarAprobación\",\n  \"claveCorrelacion\": \"n.º de solicitud\",\n  \"comportamientoSinCorrelacion\": null,\n  \"origenExterno\": false,\n  \"tipoDestinoExterno\": \"CORREO\",\n  \"comportamientoFallo\": \"CONTINUAR\",\n  \"campos\": [\n    {\n      \"nombre\": \"numeroSolicitud\",\n      \"tipoDato\": \"Texto\"\n    }\n  ],\n  \"actividadesConsumidoras\": [],\n  \"posicionX\": 700,\n  \"posicionY\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('eventoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear flujo de mensaje al pool externo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/flujos-mensaje",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "flujos-mensaje"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origenId\": \"{{eventoId}}\",\n  \"destinoId\": null,\n  \"poolDestinoId\": \"{{poolExternoId}}\",\n  \"etiqueta\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Consulta del diagrama e historial",
+      "item": [
+        {
+          "name": "Detalle con el diagrama completo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Diagrama completo', () => { const d = pm.response.json(); pm.expect(d.pools.length).to.eql(2); pm.expect(d.lanes.length).to.eql(2); pm.expect(d.actividades.length).to.eql(2); pm.expect(d.flujosMensaje.length).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial con usuario y fecha",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}/historial",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}",
+                "historial"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Registra quién hizo el cambio', () => pm.expect(pm.response.json()[0].usuario).to.eql('Ana Administradora'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publicar el proceso",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/{{procesoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "{{procesoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Solicitud de vacaciones\",\n  \"descripcion\": \"Ejemplo del enunciado\",\n  \"categoria\": \"Talento humano\",\n  \"estado\": \"PUBLICADO\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Publicado', () => pm.expect(pm.response.json().estado).to.eql('PUBLICADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Proceso inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos",
+                "999999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error con mensaje', () => pm.expect(pm.response.json()).to.have.property('mensaje'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Cierre de sesión",
+      "item": [
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin sesión no hay acceso",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

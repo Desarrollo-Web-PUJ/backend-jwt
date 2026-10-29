@@ -1,17 +1,11 @@
 package com.example.backend.controller;
 
-import com.example.backend.dto.ArcoRequestDTO;
-import com.example.backend.dto.ArcoResponseDTO;
-import com.example.backend.dto.EliminacionArcoResponseDTO;
-import com.example.backend.entity.RolUsuario;
-import com.example.backend.exception.OperacionInvalidaException;
-import com.example.backend.exception.PermisoDenegadoException;
-import com.example.backend.service.ArcoService;
-import jakarta.servlet.http.HttpSession;
-import jakarta.validation.Valid;
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,108 +14,67 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.backend.dto.ArcoRequestDTO;
+import com.example.backend.dto.ArcoResponseDTO;
+import com.example.backend.dto.EliminacionArcoResponseDTO;
+import com.example.backend.exception.OperacionInvalidaException;
+import com.example.backend.service.ArcoService;
+import com.example.backend.sesion.SesionActual;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/procesos/{procesoId}/arcos")
+@Tag(name = "Arcos", description = "HU-11 a HU-13: flujos de secuencia dentro de un mismo pool")
 public class ArcoController {
 
     private final ArcoService arcoService;
+    private final SesionActual sesionActual;
 
-    public ArcoController(ArcoService arcoService) {
+    public ArcoController(ArcoService arcoService, SesionActual sesionActual) {
         this.arcoService = arcoService;
+        this.sesionActual = sesionActual;
     }
 
-    // HU-11: Crear arco
+    @GetMapping
+    @Operation(summary = "Listar los arcos del proceso")
+    public ResponseEntity<List<ArcoResponseDTO>> listar(@PathVariable Long procesoId, HttpSession session) {
+        return ResponseEntity.ok(arcoService.listarPorProceso(procesoId, sesionActual.obtener(session)));
+    }
+
     @PostMapping
-    public ResponseEntity<ArcoResponseDTO> crearArco(
+    @Operation(summary = "Crear un arco entre actividades, gateways o eventos del mismo pool")
+    public ResponseEntity<ArcoResponseDTO> crear(
             @PathVariable Long procesoId,
             @Valid @RequestBody ArcoRequestDTO request,
             HttpSession session) {
-
-        Long empresaId = obtenerEmpresaId(session);
-        RolUsuario rol = obtenerRol(session);
-
-        ArcoResponseDTO response = arcoService.crearArco(
-                procesoId,
-                request,
-                empresaId,
-                rol
-        );
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(arcoService.crearArco(procesoId, request, sesionActual.obtener(session)));
     }
 
-    // HU-12: Editar arco
     @PutMapping("/{arcoId}")
-    public ResponseEntity<ArcoResponseDTO> editarArco(
+    @Operation(summary = "Editar un arco (nodos, etiqueta y condición)")
+    public ResponseEntity<ArcoResponseDTO> editar(
             @PathVariable Long procesoId,
             @PathVariable Long arcoId,
             @Valid @RequestBody ArcoRequestDTO request,
             HttpSession session) {
-
-        Long empresaId = obtenerEmpresaId(session);
-        RolUsuario rol = obtenerRol(session);
-
-        ArcoResponseDTO response = arcoService.editarArco(
-                procesoId,
-                arcoId,
-                request,
-                empresaId,
-                rol
-        );
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(arcoService.editarArco(procesoId, arcoId, request, sesionActual.obtener(session)));
     }
 
-    // HU-13: Eliminar arco
     @DeleteMapping("/{arcoId}")
-    public ResponseEntity<EliminacionArcoResponseDTO> eliminarArco(
+    @Operation(summary = "Eliminar un arco; requiere confirmar=true")
+    public ResponseEntity<EliminacionArcoResponseDTO> eliminar(
             @PathVariable Long procesoId,
             @PathVariable Long arcoId,
             @RequestParam(defaultValue = "false") boolean confirmar,
             HttpSession session) {
-
         if (!confirmar) {
-            throw new OperacionInvalidaException(
-                    "Debe confirmar la eliminación del arco"
-            );
+            throw new OperacionInvalidaException("Debe confirmar la eliminación del arco");
         }
-
-        Long empresaId = obtenerEmpresaId(session);
-        RolUsuario rol = obtenerRol(session);
-
-        EliminacionArcoResponseDTO response = arcoService.eliminarArco(
-                procesoId,
-                arcoId,
-                empresaId,
-                rol
-        );
-
-        return ResponseEntity.ok(response);
-    }
-
-    private Long obtenerEmpresaId(HttpSession session) {
-        Long empresaId = (Long) session.getAttribute("empresaId");
-
-        if (empresaId == null) {
-            throw new PermisoDenegadoException(
-                    "No hay una empresa asociada a la sesión"
-            );
-        }
-
-        return empresaId;
-    }
-
-    private RolUsuario obtenerRol(HttpSession session) {
-        RolUsuario rol = (RolUsuario) session.getAttribute("rol");
-
-        if (rol == null) {
-            throw new PermisoDenegadoException(
-                    "No hay un rol asociado a la sesión"
-            );
-        }
-
-        return rol;
+        return ResponseEntity.ok(arcoService.eliminarArco(procesoId, arcoId, sesionActual.obtener(session)));
     }
 }

@@ -1,19 +1,20 @@
 package com.example.backend.service;
 
+import java.util.List;
+
 import com.example.backend.dto.UsuarioActualizarRolRequestDTO;
 import com.example.backend.dto.UsuarioRegistroRequestDTO;
 import com.example.backend.dto.UsuarioResponseDTO;
-import com.example.backend.entity.RolUsuario;
-
-import java.util.List;
+import com.example.backend.sesion.UsuarioSesion;
 
 public interface UsuarioService {
-    UsuarioResponseDTO registrarUsuario(Long empresaId, RolUsuario rolSesion, UsuarioRegistroRequestDTO request);
 
-    List<UsuarioResponseDTO> listarUsuarios(Long empresaId);
+    // HU-02: registrar un colaborador en la empresa del administrador
+    UsuarioResponseDTO registrarUsuario(UsuarioSesion sesion, UsuarioRegistroRequestDTO request);
 
-    UsuarioResponseDTO cambiarRol(Long empresaId, Long usuarioId, RolUsuario rolSesion,
-                                  UsuarioActualizarRolRequestDTO request);
+    List<UsuarioResponseDTO> listarUsuarios(UsuarioSesion sesion);
 
-    UsuarioResponseDTO desactivarUsuario(Long empresaId, Long usuarioId, RolUsuario rolSesion);
+    UsuarioResponseDTO cambiarRol(UsuarioSesion sesion, Long usuarioId, UsuarioActualizarRolRequestDTO request);
+
+    UsuarioResponseDTO desactivarUsuario(UsuarioSesion sesion, Long usuarioId);
 }

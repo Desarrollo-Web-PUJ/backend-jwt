@@ -1,12 +1,14 @@
 .git
 .gitignore
-.mvn/wrapper/maven-wrapper.jar
 .idea
 .vscode
 *.iml
 
-target/*
-!target/*.jar
+# La imagen compila el proyecto dentro del contenedor (Dockerfile multi-etapa)
+target
+
+# Variables de entorno locales: nunca deben quedar dentro de la imagen
+.env
 
 logs
 *.log

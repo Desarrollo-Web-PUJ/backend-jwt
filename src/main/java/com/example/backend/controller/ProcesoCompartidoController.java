@@ -9,85 +9,63 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.backend.dto.CompartirProcesoRequestDTO;
 import com.example.backend.dto.ProcesoCompartidoResponseDTO;
-import com.example.backend.entity.RolUsuario;
-import com.example.backend.exception.SesionNoAutenticadaException;
 import com.example.backend.service.ProcesoCompartidoService;
+import com.example.backend.sesion.SesionActual;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
+@RequestMapping("/api/procesos")
+@Tag(name = "Procesos compartidos", description = "HU-23: compartir el modelo con otras empresas en solo lectura")
 public class ProcesoCompartidoController {
 
     private final ProcesoCompartidoService procesoCompartidoService;
+    private final SesionActual sesionActual;
 
-    public ProcesoCompartidoController(ProcesoCompartidoService procesoCompartidoService) {
+    public ProcesoCompartidoController(ProcesoCompartidoService procesoCompartidoService, SesionActual sesionActual) {
         this.procesoCompartidoService = procesoCompartidoService;
+        this.sesionActual = sesionActual;
     }
 
-    // HU-23: Ver con quién está compartido un proceso propio
-    @GetMapping("/api/procesos/{procesoId}/comparticiones")
+    @GetMapping("/compartidos-conmigo")
+    @Operation(summary = "Procesos de otras empresas compartidos con la mía")
+    public ResponseEntity<List<ProcesoCompartidoResponseDTO>> compartidosConmigo(HttpSession session) {
+        return ResponseEntity.ok(procesoCompartidoService.listarCompartidosConmigo(sesionActual.obtener(session)));
+    }
+
+    @GetMapping("/{procesoId}/comparticiones")
+    @Operation(summary = "Empresas con las que está compartido un proceso propio")
     public ResponseEntity<List<ProcesoCompartidoResponseDTO>> listar(
             @PathVariable Long procesoId,
             HttpSession session) {
-
-        Long empresaId = obtenerEmpresaId(session);
-        return ResponseEntity.ok(procesoCompartidoService.listarComparticiones(procesoId, empresaId));
+        return ResponseEntity.ok(procesoCompartidoService.listarComparticiones(procesoId, sesionActual.obtener(session)));
     }
 
-    // HU-23: Compartir el proceso con otra empresa (solo administrador)
-    @PostMapping("/api/procesos/{procesoId}/comparticiones")
+    @PostMapping("/{procesoId}/comparticiones")
+    @Operation(summary = "Compartir un proceso con otra empresa (solo administrador)")
     public ResponseEntity<ProcesoCompartidoResponseDTO> compartir(
             @PathVariable Long procesoId,
             @Valid @RequestBody CompartirProcesoRequestDTO request,
             HttpSession session) {
-
-        Long empresaId = obtenerEmpresaId(session);
-        RolUsuario rol = obtenerRol(session);
-
-        ProcesoCompartidoResponseDTO response =
-                procesoCompartidoService.compartir(procesoId, request, empresaId, rol);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(procesoCompartidoService.compartir(procesoId, request, sesionActual.obtener(session)));
     }
 
-    // HU-23: Dejar de compartir
-    @DeleteMapping("/api/procesos/{procesoId}/comparticiones/{empresaDestinoId}")
+    @DeleteMapping("/{procesoId}/comparticiones/{empresaDestinoId}")
+    @Operation(summary = "Dejar de compartir un proceso con una empresa")
     public ResponseEntity<Void> dejarDeCompartir(
             @PathVariable Long procesoId,
             @PathVariable Long empresaDestinoId,
             HttpSession session) {
-
-        Long empresaId = obtenerEmpresaId(session);
-        RolUsuario rol = obtenerRol(session);
-
-        procesoCompartidoService.dejarDeCompartir(procesoId, empresaDestinoId, empresaId, rol);
+        procesoCompartidoService.dejarDeCompartir(procesoId, empresaDestinoId, sesionActual.obtener(session));
         return ResponseEntity.noContent().build();
-    }
-
-    // HU-23: Procesos de otras empresas compartidos con la mía (solo lectura)
-    @GetMapping("/api/procesos/compartidos-conmigo")
-    public ResponseEntity<List<ProcesoCompartidoResponseDTO>> compartidosConmigo(HttpSession session) {
-        Long empresaId = obtenerEmpresaId(session);
-        return ResponseEntity.ok(procesoCompartidoService.listarCompartidosConmigo(empresaId));
-    }
-
-    private Long obtenerEmpresaId(HttpSession session) {
-        Long empresaId = (Long) session.getAttribute("empresaId");
-        if (empresaId == null) {
-            throw new SesionNoAutenticadaException("No hay una empresa asociada a la sesión");
-        }
-        return empresaId;
-    }
-
-    private RolUsuario obtenerRol(HttpSession session) {
-        RolUsuario rol = (RolUsuario) session.getAttribute("rol");
-        if (rol == null) {
-            throw new SesionNoAutenticadaException("No hay un rol asociado a la sesión");
-        }
-        return rol;
     }
 }

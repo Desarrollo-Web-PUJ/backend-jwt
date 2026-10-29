@@ -2,7 +2,6 @@ package com.example.backend.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,105 +9,93 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.backend.dto.CompartirProcesoRequestDTO;
 import com.example.backend.dto.ProcesoCompartidoResponseDTO;
 import com.example.backend.entity.Empresa;
-import com.example.backend.entity.HistorialProceso;
 import com.example.backend.entity.Proceso;
 import com.example.backend.entity.ProcesoCompartido;
-import com.example.backend.entity.RolUsuario;
 import com.example.backend.exception.OperacionInvalidaException;
-import com.example.backend.exception.PermisoDenegadoException;
 import com.example.backend.exception.RecursoDuplicadoException;
 import com.example.backend.exception.RecursoNoEncontradoException;
+import com.example.backend.mapper.ProcesoCompartidoMapper;
 import com.example.backend.repository.EmpresaRepository;
-import com.example.backend.repository.HistorialProcesoRepository;
 import com.example.backend.repository.ProcesoCompartidoRepository;
-import com.example.backend.repository.ProcesoRepository;
+import com.example.backend.sesion.UsuarioSesion;
 
 @Service
+@Transactional(readOnly = true)
 public class ProcesoCompartidoServiceImpl implements ProcesoCompartidoService {
 
     private final ProcesoCompartidoRepository procesoCompartidoRepository;
-    private final ProcesoRepository procesoRepository;
     private final EmpresaRepository empresaRepository;
-    private final HistorialProcesoRepository historialProcesoRepository;
+    private final HistorialService historialService;
+    private final ValidadorAcceso validadorAcceso;
+    private final ProcesoCompartidoMapper procesoCompartidoMapper;
 
     public ProcesoCompartidoServiceImpl(
             ProcesoCompartidoRepository procesoCompartidoRepository,
-            ProcesoRepository procesoRepository,
             EmpresaRepository empresaRepository,
-            HistorialProcesoRepository historialProcesoRepository) {
+            HistorialService historialService,
+            ValidadorAcceso validadorAcceso,
+            ProcesoCompartidoMapper procesoCompartidoMapper) {
         this.procesoCompartidoRepository = procesoCompartidoRepository;
-        this.procesoRepository = procesoRepository;
         this.empresaRepository = empresaRepository;
-        this.historialProcesoRepository = historialProcesoRepository;
+        this.historialService = historialService;
+        this.validadorAcceso = validadorAcceso;
+        this.procesoCompartidoMapper = procesoCompartidoMapper;
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<ProcesoCompartidoResponseDTO> listarComparticiones(Long procesoId, Long empresaId) {
-        Proceso proceso = obtenerProcesoPropio(procesoId, empresaId);
-        return procesoCompartidoRepository.findByProcesoIdAndActivoTrue(proceso.getId()).stream()
-                .map(this::convertirDTO)
+    public List<ProcesoCompartidoResponseDTO> listarComparticiones(Long procesoId, UsuarioSesion sesion) {
+        Proceso proceso = validadorAcceso.obtenerProceso(procesoId, sesion.empresaId());
+
+        return procesoCompartidoRepository.findByProcesoIdAndActivoTrue(proceso.getId())
+                .stream()
+                .map(procesoCompartidoMapper::toDTO)
                 .toList();
     }
 
     @Override
     @Transactional
-    public ProcesoCompartidoResponseDTO compartir(Long procesoId, CompartirProcesoRequestDTO request, Long empresaId, RolUsuario rol) {
-        if (rol != RolUsuario.ADMINISTRADOR) {
-            throw new PermisoDenegadoException("Solo un administrador puede compartir un proceso");
-        }
+    public ProcesoCompartidoResponseDTO compartir(Long procesoId, CompartirProcesoRequestDTO request,
+                                                  UsuarioSesion sesion) {
+        validadorAcceso.exigirAdministrador(sesion.rol(), "compartir un proceso");
+        Proceso proceso = validadorAcceso.obtenerProcesoActivo(procesoId, sesion.empresaId());
 
-        Proceso proceso = obtenerProcesoPropio(procesoId, empresaId);
-
-        if (request == null || request.getEmpresaDestinoId() == null) {
+        Long empresaDestinoId = request.getEmpresaDestinoId();
+        if (empresaDestinoId == null) {
             throw new OperacionInvalidaException("Debe indicar la empresa destino");
         }
-        if (request.getEmpresaDestinoId().equals(empresaId)) {
+        if (empresaDestinoId.equals(sesion.empresaId())) {
             throw new OperacionInvalidaException("No se puede compartir un proceso con la misma empresa propietaria");
         }
 
-        Empresa empresaDestino = empresaRepository.findById(request.getEmpresaDestinoId())
+        Empresa empresaDestino = empresaRepository.findById(empresaDestinoId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("La empresa destino no existe"));
 
-        Optional<ProcesoCompartido> compartidoExistente =
-                procesoCompartidoRepository.findByProcesoIdAndEmpresaDestinoId(
-                        proceso.getId(),
-                        empresaDestino.getId()
-                );
+        // Si ya se compartió antes y luego se retiró, se reactiva el mismo registro
+        ProcesoCompartido compartido = procesoCompartidoRepository
+                .findByProcesoIdAndEmpresaDestinoId(proceso.getId(), empresaDestino.getId())
+                .orElseGet(ProcesoCompartido::new);
 
-        if (compartidoExistente
-                .map(ProcesoCompartido::getActivo)
-                .orElse(false)) {
+        if (Boolean.TRUE.equals(compartido.getActivo()) && compartido.getId() != null) {
             throw new RecursoDuplicadoException("El proceso ya está compartido con esa empresa");
         }
-
-        ProcesoCompartido compartido =
-                compartidoExistente.orElseGet(ProcesoCompartido::new);
 
         compartido.setProceso(proceso);
         compartido.setEmpresaDestino(empresaDestino);
         compartido.setFechaCompartido(LocalDateTime.now());
         compartido.setActivo(true);
-
         compartido = procesoCompartidoRepository.save(compartido);
 
-        historialProcesoRepository.save(new HistorialProceso(
-                proceso,
-                "Se compartió el proceso (solo lectura) con la empresa \"" + empresaDestino.getNombre() + "\"",
-                LocalDateTime.now()
-        ));
+        historialService.registrar(proceso, sesion,
+                "Se compartió el proceso (solo lectura) con la empresa \"" + empresaDestino.getNombre() + "\"");
 
-        return convertirDTO(compartido);
+        return procesoCompartidoMapper.toDTO(compartido);
     }
 
     @Override
     @Transactional
-    public void dejarDeCompartir(Long procesoId, Long empresaDestinoId, Long empresaId, RolUsuario rol) {
-        if (rol != RolUsuario.ADMINISTRADOR) {
-            throw new PermisoDenegadoException("Solo un administrador puede modificar la compartición de un proceso");
-        }
-
-        Proceso proceso = obtenerProcesoPropio(procesoId, empresaId);
+    public void dejarDeCompartir(Long procesoId, Long empresaDestinoId, UsuarioSesion sesion) {
+        validadorAcceso.exigirAdministrador(sesion.rol(), "modificar la compartición de un proceso");
+        Proceso proceso = validadorAcceso.obtenerProceso(procesoId, sesion.empresaId());
 
         ProcesoCompartido compartido = procesoCompartidoRepository
                 .findByProcesoIdAndEmpresaDestinoIdAndActivoTrue(proceso.getId(), empresaDestinoId)
@@ -117,33 +104,16 @@ public class ProcesoCompartidoServiceImpl implements ProcesoCompartidoService {
         compartido.setActivo(false);
         procesoCompartidoRepository.save(compartido);
 
-        historialProcesoRepository.save(new HistorialProceso(
-                proceso,
-                "Se dejó de compartir el proceso con la empresa #" + empresaDestinoId,
-                LocalDateTime.now()
-        ));
+        historialService.registrar(proceso, sesion,
+                "Se dejó de compartir el proceso con la empresa \"" + compartido.getEmpresaDestino().getNombre() + "\"");
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<ProcesoCompartidoResponseDTO> listarCompartidosConmigo(Long empresaId) {
-        return procesoCompartidoRepository.findByEmpresaDestinoIdAndActivoTrue(empresaId).stream()
-                .map(this::convertirDTO)
+    public List<ProcesoCompartidoResponseDTO> listarCompartidosConmigo(UsuarioSesion sesion) {
+        return procesoCompartidoRepository.findByEmpresaDestinoIdAndActivoTrue(sesion.empresaId())
+                .stream()
+                .filter(compartido -> Boolean.TRUE.equals(compartido.getProceso().getActivo()))
+                .map(procesoCompartidoMapper::toDTO)
                 .toList();
-    }
-
-    private Proceso obtenerProcesoPropio(Long procesoId, Long empresaId) {
-        return procesoRepository.findByIdAndEmpresaId(procesoId, empresaId)
-                .orElseThrow(() -> new RecursoNoEncontradoException("El proceso no existe en la empresa indicada"));
-    }
-
-    private ProcesoCompartidoResponseDTO convertirDTO(ProcesoCompartido compartido) {
-        ProcesoCompartidoResponseDTO dto = new ProcesoCompartidoResponseDTO();
-        dto.setProcesoId(compartido.getProceso().getId());
-        dto.setProcesoNombre(compartido.getProceso().getNombre());
-        dto.setEmpresaDestinoId(compartido.getEmpresaDestino().getId());
-        dto.setEmpresaDestinoNombre(compartido.getEmpresaDestino().getNombre());
-        dto.setFechaCompartido(compartido.getFechaCompartido());
-        return dto;
     }
 }

@@ -1,659 +1,198 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.*;
-import com.example.backend.entity.*;
-import com.example.backend.exception.OperacionInvalidaException;
-import com.example.backend.exception.PermisoDenegadoException;
-import com.example.backend.exception.RecursoDuplicadoException;
-import com.example.backend.exception.RecursoNoEncontradoException;
-import com.example.backend.repository.ActividadRepository;
-import com.example.backend.repository.ArcoRepository;
-import com.example.backend.repository.EmpresaRepository;
-import com.example.backend.repository.EventoMensajeRepository;
-import com.example.backend.repository.FlujoMensajeRepository;
-import com.example.backend.repository.GatewayRepository;
-import com.example.backend.repository.HistorialProcesoRepository;
-import com.example.backend.repository.LaneRepository;
-import com.example.backend.repository.PoolRepository;
-import com.example.backend.repository.ProcesoCompartidoRepository;
-import com.example.backend.repository.ProcesoRepository;
-import com.example.backend.repository.UsuarioRepository;
-import org.springframework.data.domain.Page;
+import java.util.List;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.json.JsonMapper;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.example.backend.dto.HistorialProcesoDTO;
+import com.example.backend.dto.PaginaResponseDTO;
+import com.example.backend.dto.ProcesoCrearRequestDTO;
+import com.example.backend.dto.ProcesoDetalleDTO;
+import com.example.backend.dto.ProcesoEditarRequestDTO;
+import com.example.backend.dto.ProcesoListItemDTO;
+import com.example.backend.dto.ProcesoResponseDTO;
+import com.example.backend.entity.Empresa;
+import com.example.backend.entity.EstadoProceso;
+import com.example.backend.entity.Proceso;
+import com.example.backend.exception.OperacionInvalidaException;
+import com.example.backend.exception.RecursoDuplicadoException;
+import com.example.backend.exception.RecursoNoEncontradoException;
+import com.example.backend.mapper.ProcesoMapper;
+import com.example.backend.repository.EmpresaRepository;
+import com.example.backend.repository.ProcesoCompartidoRepository;
+import com.example.backend.repository.ProcesoRepository;
+import com.example.backend.sesion.UsuarioSesion;
 
 @Service
+@Transactional(readOnly = true)
 public class ProcesoServiceImpl implements ProcesoService {
 
     private final ProcesoRepository procesoRepository;
     private final EmpresaRepository empresaRepository;
-    private final UsuarioRepository usuarioRepository;
-    private final HistorialProcesoRepository historialProcesoRepository;
-    private final PoolRepository poolRepository;
-    private final LaneRepository laneRepository;
-    private final ActividadRepository actividadRepository;
-    private final GatewayRepository gatewayRepository;
-    private final ArcoRepository arcoRepository;
-    private final EventoMensajeRepository eventoMensajeRepository;
-    private final FlujoMensajeRepository flujoMensajeRepository;
     private final ProcesoCompartidoRepository procesoCompartidoRepository;
-    private final JsonMapper objectMapper;
+    private final PoolService poolService;
+    private final DiagramaProcesoService diagramaProcesoService;
+    private final HistorialService historialService;
+    private final ValidadorAcceso validadorAcceso;
+    private final ProcesoMapper procesoMapper;
 
     public ProcesoServiceImpl(
             ProcesoRepository procesoRepository,
             EmpresaRepository empresaRepository,
-            UsuarioRepository usuarioRepository,
-            HistorialProcesoRepository historialProcesoRepository,
-            PoolRepository poolRepository,
-            LaneRepository laneRepository,
-            ActividadRepository actividadRepository,
-            GatewayRepository gatewayRepository,
-            ArcoRepository arcoRepository,
-            EventoMensajeRepository eventoMensajeRepository,
-            FlujoMensajeRepository flujoMensajeRepository,
             ProcesoCompartidoRepository procesoCompartidoRepository,
-            JsonMapper objectMapper) {
+            PoolService poolService,
+            DiagramaProcesoService diagramaProcesoService,
+            HistorialService historialService,
+            ValidadorAcceso validadorAcceso,
+            ProcesoMapper procesoMapper) {
 
         this.procesoRepository = procesoRepository;
         this.empresaRepository = empresaRepository;
-        this.usuarioRepository = usuarioRepository;
-        this.historialProcesoRepository = historialProcesoRepository;
-        this.poolRepository = poolRepository;
-        this.laneRepository = laneRepository;
-        this.actividadRepository = actividadRepository;
-        this.gatewayRepository = gatewayRepository;
-        this.arcoRepository = arcoRepository;
-        this.eventoMensajeRepository = eventoMensajeRepository;
-        this.flujoMensajeRepository = flujoMensajeRepository;
         this.procesoCompartidoRepository = procesoCompartidoRepository;
-        this.objectMapper = objectMapper;
+        this.poolService = poolService;
+        this.diagramaProcesoService = diagramaProcesoService;
+        this.historialService = historialService;
+        this.validadorAcceso = validadorAcceso;
+        this.procesoMapper = procesoMapper;
     }
 
     @Override
     @Transactional
-    public ProcesoResponseDTO crearProceso(
-            Long empresaId,
-            Long usuarioId,
-            RolUsuario rol,
-            ProcesoCrearRequestDTO request) {
+    public ProcesoResponseDTO crearProceso(UsuarioSesion sesion, ProcesoCrearRequestDTO request) {
+        validadorAcceso.exigirEdicion(sesion.rol());
 
-        if (rol != RolUsuario.ADMINISTRADOR
-                && rol != RolUsuario.EDITOR) {
+        String nombre = textoObligatorio(request.getNombre(), "El nombre del proceso es obligatorio");
+        String categoria = textoObligatorio(request.getCategoria(), "La categoría es obligatoria");
 
-            throw new PermisoDenegadoException(
-                    "No tienes permisos para crear procesos"
-            );
+        if (procesoRepository.existsByNombreAndEmpresaId(nombre, sesion.empresaId())) {
+            throw new RecursoDuplicadoException("Ya existe un proceso con ese nombre en la empresa");
         }
 
-        if (request.getNombre() == null
-                || request.getNombre().isBlank()) {
-
-            throw new OperacionInvalidaException(
-                    "El nombre del proceso es obligatorio"
-            );
-        }
-
-        if (request.getCategoria() == null
-                || request.getCategoria().isBlank()) {
-
-            throw new OperacionInvalidaException(
-                    "La categoria es obligatoria"
-            );
-        }
-
-        if (procesoRepository.existsByNombreAndEmpresaId(
-                request.getNombre(),
-                empresaId)) {
-
-            throw new RecursoDuplicadoException(
-                    "Ya existe un proceso con ese nombre en la empresa"
-            );
-        }
-
-        Empresa empresa = empresaRepository
-                .findById(empresaId)
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "La empresa no existe"
-                        )
-                );
-
-        Usuario usuario = usuarioRepository
-                .findById(usuarioId)
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "El usuario no existe"
-                        )
-                );
+        Empresa empresa = empresaRepository.findById(sesion.empresaId())
+                .orElseThrow(() -> new RecursoNoEncontradoException("La empresa no existe"));
 
         Proceso proceso = new Proceso();
-
-        proceso.setNombre(request.getNombre());
-        proceso.setDescripcion(request.getDescripcion());
-        proceso.setCategoria(request.getCategoria());
+        proceso.setNombre(nombre);
+        proceso.setDescripcion(textoOpcional(request.getDescripcion()));
+        proceso.setCategoria(categoria);
         proceso.setEstado(EstadoProceso.BORRADOR);
         proceso.setActivo(true);
         proceso.setEmpresa(empresa);
-
         proceso = procesoRepository.save(proceso);
 
-        Pool poolPropio = new Pool();
-        poolPropio.setNombre(empresa.getNombre());
-        poolPropio.setTipo(TipoPool.PROPIO);
-        poolPropio.setProceso(proceso);
-        poolPropio.setActivo(true);
-        poolRepository.save(poolPropio);
+        // HU-04 / HU-21: el proceso nace con el pool de la empresa ya definido
+        poolService.crearPoolPropio(proceso);
 
-        registrarHistorial(
-                proceso,
-                "Se creo el proceso '"
-                        + proceso.getNombre()
-                        + "' (usuario: "
-                        + usuario.getNombre()
-                        + ")"
-        );
+        historialService.registrar(proceso, sesion, "Se creó el proceso '" + proceso.getNombre() + "'");
 
-        return toResponseDTO(proceso);
+        return procesoMapper.toResponseDTO(proceso);
     }
 
     @Override
     @Transactional
-    public ProcesoResponseDTO editarProceso(
-            Long procesoId,
-            Long empresaId,
-            Long usuarioId,
-            RolUsuario rol,
-            ProcesoEditarRequestDTO request) {
+    public ProcesoResponseDTO editarProceso(Long procesoId, UsuarioSesion sesion,
+                                            ProcesoEditarRequestDTO request) {
+        validadorAcceso.exigirEdicion(sesion.rol());
 
-        if (rol != RolUsuario.ADMINISTRADOR
-                && rol != RolUsuario.EDITOR) {
+        Proceso proceso = validadorAcceso.obtenerProcesoActivo(procesoId, sesion.empresaId());
 
-            throw new PermisoDenegadoException(
-                    "No tienes permisos para editar procesos"
-            );
-        }
-
-        Proceso proceso = procesoRepository
-                .findByIdAndEmpresaId(
-                        procesoId,
-                        empresaId
-                )
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "El proceso no existe"
-                        )
-                );
-
-        Usuario usuario = usuarioRepository
-                .findById(usuarioId)
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "El usuario no existe"
-                        )
-                );
-
-        if (request.getNombre() == null
-                || request.getNombre().isBlank()) {
-
-            throw new OperacionInvalidaException(
-                    "El nombre del proceso es obligatorio"
-            );
-        }
-
-        String nombre = request.getNombre().trim();
-        String categoria = request.getCategoria();
-
-        if (categoria == null
-                || categoria.isBlank()) {
-
-            throw new OperacionInvalidaException(
-                    "La categoria es obligatoria"
-            );
-        }
-
-        categoria = categoria.trim();
+        String nombre = textoObligatorio(request.getNombre(), "El nombre del proceso es obligatorio");
+        String categoria = textoObligatorio(request.getCategoria(), "La categoría es obligatoria");
 
         if (request.getEstado() == null) {
-            throw new OperacionInvalidaException(
-                    "El estado es obligatorio"
-            );
+            throw new OperacionInvalidaException("El estado es obligatorio");
         }
 
-        validarProcesoActivo(
-                proceso,
-                "No se puede editar un proceso eliminado"
-        );
-
-        if (!proceso.getNombre()
-                .equalsIgnoreCase(nombre)
-                && procesoRepository
-                .existsByNombreAndEmpresaIdAndIdNot(
-                        nombre,
-                        empresaId,
-                        procesoId
-                )) {
-
-            throw new RecursoDuplicadoException(
-                    "Ya existe un proceso con ese nombre en la empresa"
-            );
+        if (procesoRepository.existsByNombreAndEmpresaIdAndIdNot(nombre, sesion.empresaId(), procesoId)) {
+            throw new RecursoDuplicadoException("Ya existe un proceso con ese nombre en la empresa");
         }
 
         proceso.setNombre(nombre);
-        proceso.setDescripcion(normalizar(request.getDescripcion()));
+        proceso.setDescripcion(textoOpcional(request.getDescripcion()));
         proceso.setCategoria(categoria);
         proceso.setEstado(request.getEstado());
-
         proceso = procesoRepository.save(proceso);
 
-        registrarHistorial(
-                proceso,
-                "Se edito el proceso '"
-                        + proceso.getNombre()
-                        + "' (usuario: "
-                        + usuario.getNombre()
-                        + ")"
-        );
+        historialService.registrar(proceso, sesion, "Se editó el proceso '" + proceso.getNombre() + "'");
 
-        return toResponseDTO(proceso);
+        return procesoMapper.toResponseDTO(proceso);
     }
 
+    // HU-06: la eliminación es lógica; el diagrama se conserva para auditoría
     @Override
     @Transactional
-    public void eliminarProceso(
-            Long procesoId,
-            Long empresaId,
-            Long usuarioId,
-            RolUsuario rol) {
+    public void eliminarProceso(Long procesoId, UsuarioSesion sesion) {
+        validadorAcceso.exigirAdministrador(sesion.rol(), "eliminar procesos");
 
-        if (rol != RolUsuario.ADMINISTRADOR) {
-            throw new PermisoDenegadoException(
-                    "Solo un administrador puede eliminar procesos"
-            );
-        }
-
-        Proceso proceso = procesoRepository
-                .findByIdAndEmpresaId(
-                        procesoId,
-                        empresaId
-                )
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "El proceso no existe"
-                        )
-                );
-
-        Usuario usuario = usuarioRepository
-                .findById(usuarioId)
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "El usuario no existe"
-                        )
-                );
-
-        validarProcesoActivo(
-                proceso,
-                "El proceso ya está eliminado"
-        );
-
+        Proceso proceso = validadorAcceso.obtenerProcesoActivo(procesoId, sesion.empresaId());
         proceso.setActivo(false);
         procesoRepository.save(proceso);
 
-        registrarHistorial(
-                proceso,
-                "Se elimino (logicamente) el proceso '"
-                        + proceso.getNombre()
-                        + "' (usuario: "
-                        + usuario.getNombre()
-                        + ")"
-        );
+        historialService.registrar(proceso, sesion,
+                "Se eliminó (lógicamente) el proceso '" + proceso.getNombre() + "'");
     }
 
     @Override
-    public Page<ProcesoListItemDTO> listarProcesos(
-            Long empresaId,
+    public PaginaResponseDTO<ProcesoListItemDTO> listarProcesos(
+            UsuarioSesion sesion,
             String nombre,
             EstadoProceso estado,
             String categoria,
             boolean incluirInactivos,
             Pageable pageable) {
 
-        String nombreFiltro =
-                nombre == null
-                        ? ""
-                        : nombre.trim();
+        String nombreFiltro = nombre == null ? "" : nombre.trim();
+        String categoriaFiltro = textoOpcional(categoria);
 
-        return procesoRepository
-                .buscar(
-                        empresaId,
-                        incluirInactivos,
-                        nombreFiltro,
-                        estado,
-                        categoria,
-                        pageable
-                )
-                .map(p ->
-                        new ProcesoListItemDTO(
-                                p.getId(),
-                                p.getNombre(),
-                                p.getCategoria(),
-                                p.getEstado(),
-                                p.getActivo()
-                        )
-                );
+        return PaginaResponseDTO.desde(
+                procesoRepository
+                        .buscar(sesion.empresaId(), incluirInactivos, nombreFiltro, estado, categoriaFiltro, pageable)
+                        .map(procesoMapper::toListItemDTO));
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public ProcesoDetalleDTO obtenerDetalle(
-            Long procesoId,
-            Long empresaId) {
-
-        Proceso proceso = obtenerProcesoPropioOCompartido(
-                procesoId,
-                empresaId
-        );
-
-        List<PoolResponseDTO> pools = poolRepository
-                .findByProcesoIdAndActivoTrue(procesoId)
-                .stream()
-                .map(this::toPoolDTO)
-                .toList();
-
-        List<LaneDTO> lanes = laneRepository
-                .findByProcesoIdAndActivoTrueOrderByOrdenAsc(procesoId)
-                .stream()
-                .map(this::toLaneDTO)
-                .toList();
-
-        List<ActividadDTO> actividades = actividadRepository
-                .findByProcesoIdAndActivoTrue(procesoId)
-                .stream()
-                .map(this::toActividadDTO)
-                .toList();
-
-        List<GatewayResponseDTO> gateways = gatewayRepository
-                .findByProcesoIdAndActivoTrue(procesoId)
-                .stream()
-                .map(this::toGatewayDTO)
-                .toList();
-
-        List<ArcoResponseDTO> arcos = arcoRepository
-                .findByProcesoIdAndActivoTrue(procesoId)
-                .stream()
-                .map(this::toArcoDTO)
-                .toList();
-
-        List<EventoMensajeResponseDTO> eventosMensaje = eventoMensajeRepository
-                .findByProcesoIdAndActivoTrue(procesoId)
-                .stream()
-                .map(this::toEventoMensajeDTO)
-                .toList();
-
-        List<FlujoMensajeResponseDTO> flujosMensaje = flujoMensajeRepository
-                .findByProcesoIdAndActivoTrue(procesoId)
-                .stream()
-                .map(this::toFlujoMensajeDTO)
-                .toList();
-
-        return new ProcesoDetalleDTO(
-                proceso.getId(),
-                proceso.getNombre(),
-                proceso.getDescripcion(),
-                proceso.getCategoria(),
-                proceso.getEstado(),
-                proceso.getActivo(),
-                pools,
-                lanes,
-                actividades,
-                gateways,
-                arcos,
-                eventosMensaje,
-                flujosMensaje
-        );
+    public ProcesoDetalleDTO obtenerDetalle(Long procesoId, UsuarioSesion sesion) {
+        Proceso proceso = obtenerProcesoPropioOCompartido(procesoId, sesion.empresaId());
+        return diagramaProcesoService.construirDetalle(proceso);
     }
 
     @Override
-    public List<HistorialProcesoDTO> obtenerHistorial(
-            Long procesoId,
-            Long empresaId) {
-
-        procesoRepository
-                .findByIdAndEmpresaId(
-                        procesoId,
-                        empresaId
-                )
-                .orElseThrow(() ->
-                        new RecursoNoEncontradoException(
-                                "El proceso no existe"
-                        )
-                );
-
-        return historialProcesoRepository
-                .findByProcesoIdOrderByFechaDesc(
-                        procesoId
-                )
-                .stream()
-                .map(h ->
-                        new HistorialProcesoDTO(
-                                h.getId(),
-                                h.getDescripcion(),
-                                h.getFecha()
-                        )
-                )
-                .collect(Collectors.toList());
+    public List<HistorialProcesoDTO> obtenerHistorial(Long procesoId, UsuarioSesion sesion) {
+        validadorAcceso.obtenerProceso(procesoId, sesion.empresaId());
+        return historialService.listarPorProceso(procesoId);
     }
 
-    private Proceso obtenerProcesoPropioOCompartido(
-            Long procesoId,
-            Long empresaId) {
-
-        return procesoRepository
-                .findByIdAndEmpresaId(procesoId, empresaId)
-                .orElseGet(() -> {
-                    if (!procesoCompartidoRepository
-                            .existsByProcesoIdAndEmpresaDestinoIdAndActivoTrue(
-                                    procesoId,
-                                    empresaId
-                            )) {
-
-                        throw new RecursoNoEncontradoException(
-                                "El proceso no existe en la empresa indicada"
-                        );
-                    }
-
-                    Proceso compartido = procesoRepository
-                            .findById(procesoId)
-                            .orElseThrow(() ->
-                                    new RecursoNoEncontradoException(
-                                            "El proceso compartido no existe"
-                                    )
-                            );
-
-                    if (!Boolean.TRUE.equals(compartido.getActivo())) {
-                        throw new RecursoNoEncontradoException(
-                                "El proceso compartido no está activo"
-                        );
-                    }
-
-                    return compartido;
-                });
+    // HU-03 / HU-23: única excepción al aislamiento por empresa: los procesos
+    // compartidos con la empresa del usuario, siempre en solo lectura.
+    private Proceso obtenerProcesoPropioOCompartido(Long procesoId, Long empresaId) {
+        return procesoRepository.findByIdAndEmpresaId(procesoId, empresaId)
+                .orElseGet(() -> obtenerProcesoCompartido(procesoId, empresaId));
     }
 
-    private PoolResponseDTO toPoolDTO(Pool pool) {
+    private Proceso obtenerProcesoCompartido(Long procesoId, Long empresaId) {
+        boolean compartido = procesoCompartidoRepository
+                .existsByProcesoIdAndEmpresaDestinoIdAndActivoTrue(procesoId, empresaId);
 
-        PoolResponseDTO dto = new PoolResponseDTO();
-        dto.setId(pool.getId());
-        dto.setNombre(pool.getNombre());
-        dto.setTipo(pool.getTipo());
-        dto.setProcesoId(pool.getProceso().getId());
-        dto.setCantidadLanes(
-                laneRepository
-                        .findByPoolIdAndActivoTrueOrderByOrdenAsc(pool.getId())
-                        .size()
-        );
-        return dto;
-    }
-
-    private LaneDTO toLaneDTO(Lane lane) {
-
-        LaneDTO dto = new LaneDTO(lane.getId(), lane.getNombre());
-        dto.setProcesoId(lane.getProceso().getId());
-        if (lane.getPool() != null) {
-            dto.setPoolId(lane.getPool().getId());
-        }
-        if (lane.getRolProceso() != null) {
-            dto.setRolProcesoId(lane.getRolProceso().getId());
-        }
-        dto.setOrden(lane.getOrden());
-        return dto;
-    }
-
-    private ActividadDTO toActividadDTO(Actividad actividad) {
-
-        ActividadDTO dto = new ActividadDTO();
-        dto.setId(actividad.getId());
-        dto.setNombre(actividad.getNombre());
-        dto.setTipo(actividad.getTipo());
-        dto.setProcesoId(actividad.getProceso().getId());
-        dto.setLaneId(actividad.getLane().getId());
-        dto.setLaneNombre(actividad.getLane().getNombre());
-        if (actividad.getLane().getPool() != null) {
-            dto.setPoolId(actividad.getLane().getPool().getId());
-        }
-        dto.setPosicionX(actividad.getPosicionX());
-        dto.setPosicionY(actividad.getPosicionY());
-        return dto;
-    }
-
-    private GatewayResponseDTO toGatewayDTO(Gateway gateway) {
-
-        GatewayResponseDTO dto = new GatewayResponseDTO();
-        dto.setId(gateway.getId());
-        dto.setProcesoId(gateway.getProceso().getId());
-        if (gateway.getPool() != null) {
-            dto.setPoolId(gateway.getPool().getId());
-        }
-        dto.setTipo(gateway.getTipo());
-        dto.setPosicionX(gateway.getPosicionX());
-        dto.setPosicionY(gateway.getPosicionY());
-        return dto;
-    }
-
-    private ArcoResponseDTO toArcoDTO(Arco arco) {
-
-        ArcoResponseDTO dto = new ArcoResponseDTO();
-        dto.setId(arco.getId());
-        dto.setProcesoId(arco.getProceso().getId());
-        dto.setTipoOrigen(arco.getTipoOrigen());
-        dto.setOrigenId(arco.getOrigenId());
-        dto.setTipoDestino(arco.getTipoDestino());
-        dto.setDestinoId(arco.getDestinoId());
-        dto.setEtiqueta(arco.getEtiqueta());
-        dto.setCondicion(arco.getCondicion());
-        return dto;
-    }
-
-    private EventoMensajeResponseDTO toEventoMensajeDTO(EventoMensaje evento) {
-
-        EventoMensajeResponseDTO dto = new EventoMensajeResponseDTO();
-        dto.setId(evento.getId());
-        dto.setProcesoId(evento.getProceso().getId());
-        dto.setPoolId(evento.getPool().getId());
-        dto.setPoolNombre(evento.getPool().getNombre());
-        if (evento.getLane() != null) {
-            dto.setLaneId(evento.getLane().getId());
-            dto.setLaneNombre(evento.getLane().getNombre());
-        }
-        dto.setTipo(evento.getTipo());
-        dto.setNombreMensaje(evento.getNombreMensaje());
-        dto.setClaveCorrelacion(evento.getClaveCorrelacion());
-        dto.setCorrelacionDefinida(evento.getCorrelacionDefinida());
-        dto.setComportamientoSinCorrelacion(evento.getComportamientoSinCorrelacion());
-        dto.setOrigenExterno(evento.getOrigenExterno());
-        dto.setTipoDestinoExterno(evento.getTipoDestinoExterno());
-        dto.setComportamientoFallo(evento.getComportamientoFallo());
-        dto.setPosicionX(evento.getPosicionX());
-        dto.setPosicionY(evento.getPosicionY());
-
-        try {
-            if (evento.getCamposMensaje() != null) {
-                dto.setCampos(objectMapper.readValue(
-                        evento.getCamposMensaje(),
-                        new TypeReference<List<CampoMensajeDTO>>() {}
-                ));
-            }
-            if (evento.getActividadesConsumidoras() != null) {
-                dto.setActividadesConsumidoras(objectMapper.readValue(
-                        evento.getActividadesConsumidoras(),
-                        new TypeReference<List<Long>>() {}
-                ));
-            }
-        } catch (Exception ignored) {
+        if (!compartido) {
+            throw new RecursoNoEncontradoException("El proceso no existe en la empresa indicada");
         }
 
-        return dto;
+        return procesoRepository.findById(procesoId)
+                .filter(proceso -> Boolean.TRUE.equals(proceso.getActivo()))
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "El proceso compartido no existe o ya no está activo"));
     }
 
-    private FlujoMensajeResponseDTO toFlujoMensajeDTO(FlujoMensaje flujo) {
-
-        FlujoMensajeResponseDTO dto = new FlujoMensajeResponseDTO();
-        dto.setId(flujo.getId());
-        dto.setProcesoId(flujo.getProceso().getId());
-        dto.setOrigenId(flujo.getOrigen().getId());
-        if (flujo.getDestino() != null) {
-            dto.setDestinoId(flujo.getDestino().getId());
+    private String textoObligatorio(String valor, String mensajeError) {
+        if (valor == null || valor.isBlank()) {
+            throw new OperacionInvalidaException(mensajeError);
         }
-        if (flujo.getPoolDestino() != null) {
-            dto.setPoolDestinoId(flujo.getPoolDestino().getId());
-        }
-        dto.setEtiqueta(flujo.getEtiqueta());
-        return dto;
+        return valor.trim();
     }
 
-    private void registrarHistorial(
-            Proceso proceso,
-            String descripcion) {
-
-        historialProcesoRepository.save(
-                new HistorialProceso(
-                        proceso,
-                        descripcion,
-                        LocalDateTime.now()
-                )
-        );
-    }
-
-    private void validarProcesoActivo(
-            Proceso proceso,
-            String mensaje) {
-
-        if (!Boolean.TRUE.equals(proceso.getActivo())) {
-            throw new OperacionInvalidaException(mensaje);
-        }
-    }
-
-    private String normalizar(String valor) {
-        return valor == null ? null : valor.trim();
-    }
-
-    private ProcesoResponseDTO toResponseDTO(
-            Proceso proceso) {
-
-        return new ProcesoResponseDTO(
-                proceso.getId(),
-                proceso.getNombre(),
-                proceso.getDescripcion(),
-                proceso.getCategoria(),
-                proceso.getEstado(),
-                proceso.getActivo(),
-                proceso.getEmpresa().getId()
-        );
+    private String textoOpcional(String valor) {
+        return valor == null || valor.isBlank() ? null : valor.trim();
     }
 }

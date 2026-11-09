@@ -90,6 +90,24 @@ Servicios transversales que evitan código repetido:
   - Ejemplo: `ProcesoServiceImpl` pasó de 12 repositorios a 3.
 - Los controladores ya no tienen lógica: no leen atributos sueltos de la sesión ni arman respuestas a mano.
 
+## Autenticación con JWT
+
+La API acepta un token JWT (firmado con HMAC-SHA256) en el encabezado `Authorization`.
+
+1. `POST /api/auth/token` con `{"correo": "...", "password": "..."}` devuelve `{token, tipo: "Bearer", expiraEnSegundos, usuario}`.
+2. En cada petición se envía `Authorization: Bearer <token>`.
+3. Si el token falta, fue alterado o venció, la API responde 401.
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| `seguridad/JwtService` | Genera y valida el token (firma y vencimiento). |
+| `sesion/SesionActual` | Lee el token de la petición; si no hay token, usa la sesión HTTP. |
+| `controller/AuthController` | Endpoint `POST /api/auth/token`. |
+
+El token solo guarda el id del usuario (`sub`), la emisión (`iat`) y el vencimiento (`exp`); el rol y la empresa se consultan en la base de datos en cada petición.
+Configuración: `JWT_SECRET` (mínimo 32 caracteres) y `JWT_EXPIRACION_MINUTOS` (60 por defecto).
+En Swagger: ejecute `/api/auth/token`, pulse **Authorize** y pegue el token.
+
 ## Seguridad y sesión
 
 - Contraseñas con BCrypt.

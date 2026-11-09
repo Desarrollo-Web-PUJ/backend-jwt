@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.backend.dto.LoginRequestDTO;
 import com.example.backend.dto.LoginResponseDTO;
+import com.example.backend.dto.TokenResponseDTO;
+import com.example.backend.seguridad.JwtService;
 import com.example.backend.service.AuthService;
 import com.example.backend.sesion.SesionActual;
 
@@ -20,15 +22,25 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "Autenticación", description = "HU-03: inicio y cierre de sesión")
+@Tag(name = "Autenticación", description = "HU-03: inicio y cierre de sesión (sesión HTTP o JWT)")
 public class AuthController {
 
     private final AuthService authService;
     private final SesionActual sesionActual;
+    private final JwtService jwtService;
 
-    public AuthController(AuthService authService, SesionActual sesionActual) {
+    public AuthController(AuthService authService, SesionActual sesionActual, JwtService jwtService) {
         this.authService = authService;
         this.sesionActual = sesionActual;
+        this.jwtService = jwtService;
+    }
+
+    @PostMapping("/token")
+    @Operation(summary = "Iniciar sesión con JWT: devuelve un token para el encabezado Authorization: Bearer <token>")
+    public ResponseEntity<TokenResponseDTO> generarToken(@Valid @RequestBody LoginRequestDTO request) {
+        LoginResponseDTO usuario = authService.iniciarSesion(request);
+        String token = jwtService.generar(usuario.getUsuarioId());
+        return ResponseEntity.ok(new TokenResponseDTO(token, "Bearer", jwtService.getExpiracionSegundos(), usuario));
     }
 
     @PostMapping("/login")

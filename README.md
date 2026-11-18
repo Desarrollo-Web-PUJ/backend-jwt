@@ -92,7 +92,7 @@ Servicios transversales que evitan código repetido:
 
 ## Autenticación con JWT
 
-La API acepta un token JWT (firmado con HMAC-SHA256) en el encabezado `Authorization`.
+La API acepta un token JWT en el encabezado `Authorization`. El token se genera y se valida con la librería [JJWT](https://github.com/jwtk/jjwt) 0.12.6 (firma HMAC-SHA256).
 
 1. `POST /api/auth/token` con `{"correo": "...", "password": "..."}` devuelve `{token, tipo: "Bearer", expiraEnSegundos, usuario}`.
 2. En cada petición se envía `Authorization: Bearer <token>`.
@@ -100,7 +100,7 @@ La API acepta un token JWT (firmado con HMAC-SHA256) en el encabezado `Authoriza
 
 | Archivo | Responsabilidad |
 | --- | --- |
-| `seguridad/JwtService` | Genera y valida el token (firma y vencimiento). |
+| `seguridad/JwtService` | Genera y valida el token con JJWT (`Jwts.builder()` y `Jwts.parser()`). |
 | `sesion/SesionActual` | Lee el token de la petición; si no hay token, usa la sesión HTTP. |
 | `controller/AuthController` | Endpoint `POST /api/auth/token`. |
 

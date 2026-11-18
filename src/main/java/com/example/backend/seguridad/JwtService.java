@@ -1,45 +1,42 @@
 package com.example.backend.seguridad;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Date;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.example.backend.exception.SesionNoAutenticadaException;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+
 /**
- * Genera y valida tokens JWT firmados con HMAC-SHA256 (HS256).
+ * Genera y valida tokens JWT con la librería JJWT (io.jsonwebtoken).
  *
- * Estructura del token: encabezado.contenido.firma (cada parte en Base64 URL).
- * El contenido guarda el id del usuario (sub), la fecha de emisión (iat) y la
- * de vencimiento (exp). El rol y la empresa NO van en el token: se leen de la
+ * La librería se encarga de armar el token (encabezado.contenido.firma),
+ * firmarlo con HMAC-SHA256 y, al validarlo, comprobar la firma y el
+ * vencimiento. El token guarda el id del usuario (sub), la emisión (iat) y el
+ * vencimiento (exp). El rol y la empresa NO van en el token: se leen de la
  * base de datos en cada petición, así un cambio de rol aplica de inmediato.
  */
 @Service
 public class JwtService {
 
-    private static final String ENCABEZADO = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-    private static final Pattern SUB = Pattern.compile("\"sub\":\"(\\d+)\"");
-    private static final Pattern EXP = Pattern.compile("\"exp\":(\\d+)");
-
-    private final byte[] clave;
+    private final SecretKey clave;
     private final long expiracionSegundos;
 
     public JwtService(
             @Value("${jwt.secret}") String secreto,
             @Value("${jwt.expiracion-minutos}") long expiracionMinutos) {
-        if (secreto.length() < 32) {
-            throw new IllegalStateException("jwt.secret debe tener al menos 32 caracteres");
-        }
-        this.clave = secreto.getBytes(StandardCharsets.UTF_8);
+        // HS256 exige una clave de al menos 256 bits (32 bytes)
+        this.clave = Keys.hmacShaKeyFor(secreto.getBytes(StandardCharsets.UTF_8));
         this.expiracionSegundos = expiracionMinutos * 60;
     }
 
@@ -47,15 +44,15 @@ public class JwtService {
         return expiracionSegundos;
     }
 
-    /** Crea un token para el usuario indicado. */
+    /** Crea un token firmado para el usuario indicado. */
     public String generar(Long usuarioId) {
-        long ahora = Instant.now().getEpochSecond();
-        String contenido = "{\"sub\":\"" + usuarioId + "\",\"iat\":" + ahora
-                + ",\"exp\":" + (ahora + expiracionSegundos) + "}";
-
-        String sinFirma = base64(ENCABEZADO.getBytes(StandardCharsets.UTF_8)) + "."
-                + base64(contenido.getBytes(StandardCharsets.UTF_8));
-        return sinFirma + "." + base64(firmar(sinFirma));
+        Instant ahora = Instant.now();
+        return Jwts.builder()
+                .subject(String.valueOf(usuarioId))
+                .issuedAt(Date.from(ahora))
+                .expiration(Date.from(ahora.plusSeconds(expiracionSegundos)))
+                .signWith(clave, Jwts.SIG.HS256)
+                .compact();
     }
 
     /**
@@ -64,53 +61,17 @@ public class JwtService {
      * @throws SesionNoAutenticadaException si el token es inválido o venció
      */
     public Long validar(String token) {
-        String[] partes = token.split("\\.");
-        if (partes.length != 3) {
-            throw new SesionNoAutenticadaException("Token inválido");
-        }
-
-        byte[] firmaEsperada = firmar(partes[0] + "." + partes[1]);
-        byte[] firmaRecibida;
         try {
-            firmaRecibida = Base64.getUrlDecoder().decode(partes[2]);
-        } catch (IllegalArgumentException e) {
-            throw new SesionNoAutenticadaException("Token inválido");
-        }
-        // Comparación en tiempo constante para no filtrar información
-        if (!MessageDigest.isEqual(firmaEsperada, firmaRecibida)) {
-            throw new SesionNoAutenticadaException("Token inválido: la firma no coincide");
-        }
-
-        String contenido;
-        try {
-            contenido = new String(Base64.getUrlDecoder().decode(partes[1]), StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException e) {
-            throw new SesionNoAutenticadaException("Token inválido");
-        }
-
-        Matcher exp = EXP.matcher(contenido);
-        if (!exp.find() || Long.parseLong(exp.group(1)) < Instant.now().getEpochSecond()) {
+            Claims contenido = Jwts.parser()
+                    .verifyWith(clave)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return Long.valueOf(contenido.getSubject());
+        } catch (ExpiredJwtException e) {
             throw new SesionNoAutenticadaException("El token venció, inicie sesión de nuevo");
-        }
-
-        Matcher sub = SUB.matcher(contenido);
-        if (!sub.find()) {
+        } catch (JwtException | IllegalArgumentException e) {
             throw new SesionNoAutenticadaException("Token inválido");
         }
-        return Long.valueOf(sub.group(1));
-    }
-
-    private byte[] firmar(String datos) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(clave, "HmacSHA256"));
-            return mac.doFinal(datos.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
-            throw new IllegalStateException("No se pudo firmar el token", e);
-        }
-    }
-
-    private static String base64(byte[] datos) {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(datos);
     }
 }

@@ -15,7 +15,7 @@ carpeta-del-proyecto/
 
 ```bash
 cd backend
-cp .env.example .env          # cambie DB_PASSWORD
+cp .env.example .env          # cambie DB_PASSWORD y JWT_SECRET
 docker compose up --build
 ```
 
@@ -53,6 +53,25 @@ La configuración se lee de variables de entorno, con valores por defecto para d
 | `DB_USERNAME` / `DB_PASSWORD` | `proyecto_user` / la clave local del equipo |
 | `JPA_DDL_AUTO` | `update` |
 | `JPA_SHOW_SQL` | `false` |
+
+## CI/CD con GitHub Actions
+
+Cada repositorio tiene su pipeline en `.github/workflows/ci-cd.yml`, que corre en cada push y pull request a `main`:
+
+| Etapa | Dónde corre | Qué hace |
+| --- | --- | --- |
+| `pruebas` | GitHub (Ubuntu) | `./mvnw -B verify`: compila y corre las pruebas unitarias y de integración (con H2). Guarda el reporte. |
+| `imagen` | GitHub (Ubuntu) | Construye la imagen Docker del backend. |
+| `despliegue` | Runner propio (`self-hosted`) | Descarga backend y frontend, crea el `.env` con los secretos y ejecuta `docker compose up -d --build`. Verifica que la API y el frontend respondan. |
+
+El despliegue se despliega en **tres componentes por separado** (base de datos, backend y frontend), cada uno en su propio contenedor.
+
+Para activar el despliegue automático:
+1. Registrar un runner propio en el equipo que hará de servidor: *Settings → Actions → Runners → New self-hosted runner* (requiere Docker).
+2. Crear los secretos `DB_PASSWORD` y `JWT_SECRET`: *Settings → Secrets and variables → Actions → Secrets*.
+3. Crear la variable `DESPLIEGUE_HABILITADO` con valor `true`: *Settings → Secrets and variables → Actions → Variables*.
+
+Sin el paso 3, las etapas de pruebas e imagen corren igual y el despliegue se omite.
 
 ## Arquitectura
 

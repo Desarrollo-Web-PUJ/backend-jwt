@@ -23,7 +23,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -41,18 +40,17 @@ public class GatewayController {
 
     @GetMapping
     @Operation(summary = "Listar los gateways del proceso")
-    public ResponseEntity<List<GatewayResponseDTO>> listar(@PathVariable Long procesoId, HttpSession session) {
-        return ResponseEntity.ok(gatewayService.listarPorProceso(procesoId, sesionActual.obtener(session)));
+    public ResponseEntity<List<GatewayResponseDTO>> listar(@PathVariable Long procesoId) {
+        return ResponseEntity.ok(gatewayService.listarPorProceso(procesoId, sesionActual.obtener()));
     }
 
     @PostMapping
     @Operation(summary = "Crear un gateway en un pool")
     public ResponseEntity<GatewayResponseDTO> crear(
             @PathVariable Long procesoId,
-            @Valid @RequestBody GatewayRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody GatewayRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(gatewayService.crearGateway(procesoId, request, sesionActual.obtener(session)));
+                .body(gatewayService.crearGateway(procesoId, request, sesionActual.obtener()));
     }
 
     @PutMapping("/{gatewayId}")
@@ -60,10 +58,9 @@ public class GatewayController {
     public ResponseEntity<EdicionGatewayResponseDTO> editar(
             @PathVariable Long procesoId,
             @PathVariable Long gatewayId,
-            @Valid @RequestBody GatewayRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody GatewayRequestDTO request) {
         return ResponseEntity.ok(
-                gatewayService.editarGateway(procesoId, gatewayId, request, sesionActual.obtener(session)));
+                gatewayService.editarGateway(procesoId, gatewayId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{gatewayId}")
@@ -71,9 +68,8 @@ public class GatewayController {
     public ResponseEntity<EliminacionGatewayResponseDTO> eliminar(
             @PathVariable Long procesoId,
             @PathVariable Long gatewayId,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         return ResponseEntity.ok(
-                gatewayService.eliminarGateway(procesoId, gatewayId, confirmar, sesionActual.obtener(session)));
+                gatewayService.eliminarGateway(procesoId, gatewayId, confirmar, sesionActual.obtener()));
     }
 }

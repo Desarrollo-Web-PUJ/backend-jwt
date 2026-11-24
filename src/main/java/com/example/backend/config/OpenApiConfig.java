@@ -26,9 +26,8 @@ public class OpenApiConfig {
                         .version("2.1")
                         .description("""
                                 Servicios REST del sistema de gestión de procesos multiempresa.
-                                Autenticación con JWT: ejecute POST /api/auth/token, copie el
-                                token, pulse Authorize y péguelo. También se acepta la sesión
-                                HTTP (POST /api/auth/login) que usa el frontend."""))
+                                Seguridad con Spring Security y JWT (librería JJWT): ejecute
+                                POST /api/auth/login, copie el token, pulse Authorize y péguelo."""))
                 .components(new Components().addSecuritySchemes(ESQUEMA_JWT,
                         new SecurityScheme()
                                 .type(SecurityScheme.Type.HTTP)

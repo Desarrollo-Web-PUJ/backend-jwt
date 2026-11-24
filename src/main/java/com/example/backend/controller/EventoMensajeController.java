@@ -23,7 +23,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -41,18 +40,17 @@ public class EventoMensajeController {
 
     @GetMapping
     @Operation(summary = "Listar los eventos de mensaje del proceso")
-    public ResponseEntity<List<EventoMensajeResponseDTO>> listar(@PathVariable Long procesoId, HttpSession session) {
-        return ResponseEntity.ok(eventoService.listarPorProceso(procesoId, sesionActual.obtener(session)));
+    public ResponseEntity<List<EventoMensajeResponseDTO>> listar(@PathVariable Long procesoId) {
+        return ResponseEntity.ok(eventoService.listarPorProceso(procesoId, sesionActual.obtener()));
     }
 
     @PostMapping
     @Operation(summary = "Crear un evento de mensaje (devuelve advertencias de modelado)")
     public ResponseEntity<EventoMensajeResponseDTO> crear(
             @PathVariable Long procesoId,
-            @Valid @RequestBody EventoMensajeRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody EventoMensajeRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(eventoService.crearEvento(procesoId, request, sesionActual.obtener(session)));
+                .body(eventoService.crearEvento(procesoId, request, sesionActual.obtener()));
     }
 
     @PutMapping("/{eventoId}")
@@ -60,9 +58,8 @@ public class EventoMensajeController {
     public ResponseEntity<EventoMensajeResponseDTO> editar(
             @PathVariable Long procesoId,
             @PathVariable Long eventoId,
-            @Valid @RequestBody EventoMensajeRequestDTO request,
-            HttpSession session) {
-        return ResponseEntity.ok(eventoService.editarEvento(procesoId, eventoId, request, sesionActual.obtener(session)));
+            @Valid @RequestBody EventoMensajeRequestDTO request) {
+        return ResponseEntity.ok(eventoService.editarEvento(procesoId, eventoId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{eventoId}")
@@ -70,11 +67,10 @@ public class EventoMensajeController {
     public ResponseEntity<EliminacionEventoMensajeResponseDTO> eliminar(
             @PathVariable Long procesoId,
             @PathVariable Long eventoId,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         if (!confirmar) {
             throw new OperacionInvalidaException("Debe confirmar la eliminación del evento");
         }
-        return ResponseEntity.ok(eventoService.eliminarEvento(procesoId, eventoId, sesionActual.obtener(session)));
+        return ResponseEntity.ok(eventoService.eliminarEvento(procesoId, eventoId, sesionActual.obtener()));
     }
 }

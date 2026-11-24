@@ -23,7 +23,6 @@ import com.example.backend.sesion.UsuarioSesion;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -43,18 +42,16 @@ public class UsuarioController {
     @Operation(summary = "Registrar un colaborador en la empresa")
     public ResponseEntity<UsuarioResponseDTO> registrarUsuario(
             @PathVariable Long empresaId,
-            @Valid @RequestBody UsuarioRegistroRequestDTO request,
-            HttpSession session) {
-        UsuarioSesion sesion = sesionDeLaEmpresa(empresaId, session);
+            @Valid @RequestBody UsuarioRegistroRequestDTO request) {
+        UsuarioSesion sesion = sesionDeLaEmpresa(empresaId);
         return ResponseEntity.status(HttpStatus.CREATED).body(usuarioService.registrarUsuario(sesion, request));
     }
 
     @GetMapping
     @Operation(summary = "Listar los usuarios de la empresa")
     public ResponseEntity<List<UsuarioResponseDTO>> listarUsuarios(
-            @PathVariable Long empresaId,
-            HttpSession session) {
-        return ResponseEntity.ok(usuarioService.listarUsuarios(sesionDeLaEmpresa(empresaId, session)));
+            @PathVariable Long empresaId) {
+        return ResponseEntity.ok(usuarioService.listarUsuarios(sesionDeLaEmpresa(empresaId)));
     }
 
     @PutMapping("/{usuarioId}/rol")
@@ -62,9 +59,8 @@ public class UsuarioController {
     public ResponseEntity<UsuarioResponseDTO> cambiarRol(
             @PathVariable Long empresaId,
             @PathVariable Long usuarioId,
-            @Valid @RequestBody UsuarioActualizarRolRequestDTO request,
-            HttpSession session) {
-        UsuarioSesion sesion = sesionDeLaEmpresa(empresaId, session);
+            @Valid @RequestBody UsuarioActualizarRolRequestDTO request) {
+        UsuarioSesion sesion = sesionDeLaEmpresa(empresaId);
         return ResponseEntity.ok(usuarioService.cambiarRol(sesion, usuarioId, request));
     }
 
@@ -72,15 +68,14 @@ public class UsuarioController {
     @Operation(summary = "Desactivar un colaborador (sin borrar su historial)")
     public ResponseEntity<UsuarioResponseDTO> desactivarUsuario(
             @PathVariable Long empresaId,
-            @PathVariable Long usuarioId,
-            HttpSession session) {
-        UsuarioSesion sesion = sesionDeLaEmpresa(empresaId, session);
+            @PathVariable Long usuarioId) {
+        UsuarioSesion sesion = sesionDeLaEmpresa(empresaId);
         return ResponseEntity.ok(usuarioService.desactivarUsuario(sesion, usuarioId));
     }
 
     // La empresa de la URL debe ser la del usuario autenticado: aislamiento por empresa
-    private UsuarioSesion sesionDeLaEmpresa(Long empresaId, HttpSession session) {
-        UsuarioSesion sesion = sesionActual.obtener(session);
+    private UsuarioSesion sesionDeLaEmpresa(Long empresaId) {
+        UsuarioSesion sesion = sesionActual.obtener();
         if (!sesion.empresaId().equals(empresaId)) {
             throw new PermisoDenegadoException("No puede gestionar usuarios de otra empresa");
         }

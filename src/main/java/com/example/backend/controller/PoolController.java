@@ -24,7 +24,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -42,27 +41,25 @@ public class PoolController {
 
     @GetMapping
     @Operation(summary = "Listar los pools del proceso")
-    public ResponseEntity<List<PoolResponseDTO>> listar(@PathVariable Long procesoId, HttpSession session) {
-        return ResponseEntity.ok(poolService.listarPorProceso(procesoId, sesionActual.obtener(session)));
+    public ResponseEntity<List<PoolResponseDTO>> listar(@PathVariable Long procesoId) {
+        return ResponseEntity.ok(poolService.listarPorProceso(procesoId, sesionActual.obtener()));
     }
 
     @GetMapping("/{poolId}/roles-disponibles")
     @Operation(summary = "Roles de proceso que pueden asignarse a las lanes del pool")
     public ResponseEntity<List<RolProcesoResponseDTO>> rolesDisponibles(
             @PathVariable Long procesoId,
-            @PathVariable Long poolId,
-            HttpSession session) {
-        return ResponseEntity.ok(poolService.listarRolesDisponibles(procesoId, poolId, sesionActual.obtener(session)));
+            @PathVariable Long poolId) {
+        return ResponseEntity.ok(poolService.listarRolesDisponibles(procesoId, poolId, sesionActual.obtener()));
     }
 
     @PostMapping
     @Operation(summary = "Crear un pool (propio o externo / caja negra)")
     public ResponseEntity<PoolResponseDTO> crear(
             @PathVariable Long procesoId,
-            @Valid @RequestBody PoolRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody PoolRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(poolService.crearPool(procesoId, request, sesionActual.obtener(session)));
+                .body(poolService.crearPool(procesoId, request, sesionActual.obtener()));
     }
 
     @PutMapping("/{poolId}")
@@ -70,9 +67,8 @@ public class PoolController {
     public ResponseEntity<PoolResponseDTO> editar(
             @PathVariable Long procesoId,
             @PathVariable Long poolId,
-            @Valid @RequestBody PoolRequestDTO request,
-            HttpSession session) {
-        return ResponseEntity.ok(poolService.editarPool(procesoId, poolId, request, sesionActual.obtener(session)));
+            @Valid @RequestBody PoolRequestDTO request) {
+        return ResponseEntity.ok(poolService.editarPool(procesoId, poolId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{poolId}")
@@ -80,11 +76,10 @@ public class PoolController {
     public ResponseEntity<EliminacionPoolResponseDTO> eliminar(
             @PathVariable Long procesoId,
             @PathVariable Long poolId,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         if (!confirmar) {
             throw new OperacionInvalidaException("Debe confirmar la eliminación del pool");
         }
-        return ResponseEntity.ok(poolService.eliminarPool(procesoId, poolId, sesionActual.obtener(session)));
+        return ResponseEntity.ok(poolService.eliminarPool(procesoId, poolId, sesionActual.obtener()));
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -89,6 +90,12 @@ public class GlobalExceptionHandler {
 
     // Excepciones propias de Spring MVC (ruta inexistente, método no permitido...)
     // conservan su código HTTP; cualquier otra se registra y responde 500.
+    // Spring Security: acceso denegado lanzado dentro de un controlador o servicio
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponseDTO> manejarAccesoDenegado(AccessDeniedException ex) {
+        return responder(HttpStatus.FORBIDDEN, "No tiene permisos para realizar esta operación");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> manejarGeneral(Exception ex) {
         if (ex instanceof ErrorResponse errorSpring) {

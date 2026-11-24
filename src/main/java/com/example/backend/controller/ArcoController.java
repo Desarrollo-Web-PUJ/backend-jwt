@@ -23,7 +23,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -41,18 +40,17 @@ public class ArcoController {
 
     @GetMapping
     @Operation(summary = "Listar los arcos del proceso")
-    public ResponseEntity<List<ArcoResponseDTO>> listar(@PathVariable Long procesoId, HttpSession session) {
-        return ResponseEntity.ok(arcoService.listarPorProceso(procesoId, sesionActual.obtener(session)));
+    public ResponseEntity<List<ArcoResponseDTO>> listar(@PathVariable Long procesoId) {
+        return ResponseEntity.ok(arcoService.listarPorProceso(procesoId, sesionActual.obtener()));
     }
 
     @PostMapping
     @Operation(summary = "Crear un arco entre actividades, gateways o eventos del mismo pool")
     public ResponseEntity<ArcoResponseDTO> crear(
             @PathVariable Long procesoId,
-            @Valid @RequestBody ArcoRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody ArcoRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(arcoService.crearArco(procesoId, request, sesionActual.obtener(session)));
+                .body(arcoService.crearArco(procesoId, request, sesionActual.obtener()));
     }
 
     @PutMapping("/{arcoId}")
@@ -60,9 +58,8 @@ public class ArcoController {
     public ResponseEntity<ArcoResponseDTO> editar(
             @PathVariable Long procesoId,
             @PathVariable Long arcoId,
-            @Valid @RequestBody ArcoRequestDTO request,
-            HttpSession session) {
-        return ResponseEntity.ok(arcoService.editarArco(procesoId, arcoId, request, sesionActual.obtener(session)));
+            @Valid @RequestBody ArcoRequestDTO request) {
+        return ResponseEntity.ok(arcoService.editarArco(procesoId, arcoId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{arcoId}")
@@ -70,11 +67,10 @@ public class ArcoController {
     public ResponseEntity<EliminacionArcoResponseDTO> eliminar(
             @PathVariable Long procesoId,
             @PathVariable Long arcoId,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         if (!confirmar) {
             throw new OperacionInvalidaException("Debe confirmar la eliminación del arco");
         }
-        return ResponseEntity.ok(arcoService.eliminarArco(procesoId, arcoId, sesionActual.obtener(session)));
+        return ResponseEntity.ok(arcoService.eliminarArco(procesoId, arcoId, sesionActual.obtener()));
     }
 }

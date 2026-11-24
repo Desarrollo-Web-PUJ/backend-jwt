@@ -61,6 +61,12 @@
 
         <!-- JWT: librería JJWT (io.jsonwebtoken) para generar, firmar y validar tokens.
              jjwt-api se usa en el código; jjwt-impl y jjwt-gson solo se necesitan al ejecutar. -->
+        <!-- Spring Security: cadena de filtros, autenticación con JWT y autorización por rol -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -115,6 +121,12 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
+        </dependency>
+        <!-- Base de datos en memoria para las pruebas de integración (no requiere PostgreSQL) -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

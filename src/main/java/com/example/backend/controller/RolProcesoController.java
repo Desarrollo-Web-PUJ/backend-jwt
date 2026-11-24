@@ -25,7 +25,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -45,38 +44,34 @@ public class RolProcesoController {
     @Operation(summary = "Consultar roles de proceso (paginado, con búsqueda y uso en procesos)")
     public ResponseEntity<PaginaResponseDTO<RolProcesoListItemDTO>> consultar(
             @RequestParam(required = false) String nombre,
-            @PageableDefault(size = 10, sort = "nombre") Pageable pageable,
-            HttpSession session) {
-        return ResponseEntity.ok(rolProcesoService.consultar(nombre, pageable, sesionActual.obtener(session)));
+            @PageableDefault(size = 10, sort = "nombre") Pageable pageable) {
+        return ResponseEntity.ok(rolProcesoService.consultar(nombre, pageable, sesionActual.obtener()));
     }
 
     @PostMapping
     @Operation(summary = "Crear un rol de proceso")
     public ResponseEntity<RolProcesoResponseDTO> crear(
-            @Valid @RequestBody RolProcesoRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody RolProcesoRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(rolProcesoService.crear(request, sesionActual.obtener(session)));
+                .body(rolProcesoService.crear(request, sesionActual.obtener()));
     }
 
     @PutMapping("/{rolProcesoId}")
     @Operation(summary = "Editar un rol de proceso (renombra todas las lanes que lo usan)")
     public ResponseEntity<RolProcesoResponseDTO> editar(
             @PathVariable Long rolProcesoId,
-            @Valid @RequestBody RolProcesoRequestDTO request,
-            HttpSession session) {
-        return ResponseEntity.ok(rolProcesoService.editar(rolProcesoId, request, sesionActual.obtener(session)));
+            @Valid @RequestBody RolProcesoRequestDTO request) {
+        return ResponseEntity.ok(rolProcesoService.editar(rolProcesoId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{rolProcesoId}")
     @Operation(summary = "Eliminar (lógicamente) un rol de proceso que no esté en uso; requiere confirmar=true")
     public ResponseEntity<EliminacionRolProcesoResponseDTO> eliminar(
             @PathVariable Long rolProcesoId,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         if (!confirmar) {
             throw new OperacionInvalidaException("Debe confirmar la eliminación del rol de proceso");
         }
-        return ResponseEntity.ok(rolProcesoService.eliminar(rolProcesoId, sesionActual.obtener(session)));
+        return ResponseEntity.ok(rolProcesoService.eliminar(rolProcesoId, sesionActual.obtener()));
     }
 }

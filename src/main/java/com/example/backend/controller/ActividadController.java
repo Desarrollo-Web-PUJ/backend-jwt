@@ -23,7 +23,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -41,18 +40,17 @@ public class ActividadController {
 
     @GetMapping
     @Operation(summary = "Listar las actividades del proceso")
-    public ResponseEntity<List<ActividadDTO>> listar(@PathVariable Long procesoId, HttpSession session) {
-        return ResponseEntity.ok(actividadService.listarPorProceso(procesoId, sesionActual.obtener(session)));
+    public ResponseEntity<List<ActividadDTO>> listar(@PathVariable Long procesoId) {
+        return ResponseEntity.ok(actividadService.listarPorProceso(procesoId, sesionActual.obtener()));
     }
 
     @PostMapping
     @Operation(summary = "Crear una actividad en una lane")
     public ResponseEntity<ActividadDTO> crear(
             @PathVariable Long procesoId,
-            @Valid @RequestBody ActividadRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody ActividadRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(actividadService.crearActividad(procesoId, request, sesionActual.obtener(session)));
+                .body(actividadService.crearActividad(procesoId, request, sesionActual.obtener()));
     }
 
     @PutMapping("/{actividadId}")
@@ -60,10 +58,9 @@ public class ActividadController {
     public ResponseEntity<ActividadDTO> editar(
             @PathVariable Long procesoId,
             @PathVariable Long actividadId,
-            @Valid @RequestBody ActividadRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody ActividadRequestDTO request) {
         return ResponseEntity.ok(
-                actividadService.editarActividad(procesoId, actividadId, request, sesionActual.obtener(session)));
+                actividadService.editarActividad(procesoId, actividadId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{actividadId}")
@@ -71,12 +68,11 @@ public class ActividadController {
     public ResponseEntity<EliminacionActividadResponseDTO> eliminar(
             @PathVariable Long procesoId,
             @PathVariable Long actividadId,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         if (!confirmar) {
             throw new OperacionInvalidaException("Debe confirmar la eliminación de la actividad");
         }
         return ResponseEntity.ok(
-                actividadService.eliminarActividad(procesoId, actividadId, sesionActual.obtener(session)));
+                actividadService.eliminarActividad(procesoId, actividadId, sesionActual.obtener()));
     }
 }

@@ -31,7 +31,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -54,53 +53,49 @@ public class ProcesoController {
             @RequestParam(required = false) EstadoProceso estado,
             @RequestParam(required = false) String categoria,
             @RequestParam(defaultValue = "false") boolean incluirInactivos,
-            @PageableDefault(size = 10, sort = "nombre", direction = Sort.Direction.ASC) Pageable pageable,
-            HttpSession session) {
+            @PageableDefault(size = 10, sort = "nombre", direction = Sort.Direction.ASC) Pageable pageable) {
 
         return ResponseEntity.ok(procesoService.listarProcesos(
-                sesionActual.obtener(session), nombre, estado, categoria, incluirInactivos, pageable));
+                sesionActual.obtener(), nombre, estado, categoria, incluirInactivos, pageable));
     }
 
     @PostMapping
     @Operation(summary = "Crear un proceso (nace en borrador y con el pool de la empresa)")
     public ResponseEntity<ProcesoResponseDTO> crear(
-            @Valid @RequestBody ProcesoCrearRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody ProcesoCrearRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(procesoService.crearProceso(sesionActual.obtener(session), request));
+                .body(procesoService.crearProceso(sesionActual.obtener(), request));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Consultar el diagrama completo de un proceso (propio o compartido)")
-    public ResponseEntity<ProcesoDetalleDTO> detalle(@PathVariable Long id, HttpSession session) {
-        return ResponseEntity.ok(procesoService.obtenerDetalle(id, sesionActual.obtener(session)));
+    public ResponseEntity<ProcesoDetalleDTO> detalle(@PathVariable Long id) {
+        return ResponseEntity.ok(procesoService.obtenerDetalle(id, sesionActual.obtener()));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Editar nombre, descripción, categoría y estado de un proceso")
     public ResponseEntity<ProcesoResponseDTO> editar(
             @PathVariable Long id,
-            @Valid @RequestBody ProcesoEditarRequestDTO request,
-            HttpSession session) {
-        return ResponseEntity.ok(procesoService.editarProceso(id, sesionActual.obtener(session), request));
+            @Valid @RequestBody ProcesoEditarRequestDTO request) {
+        return ResponseEntity.ok(procesoService.editarProceso(id, sesionActual.obtener(), request));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Eliminar (lógicamente) un proceso; requiere confirmar=true")
     public ResponseEntity<Void> eliminar(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         if (!confirmar) {
             throw new OperacionInvalidaException("Debe confirmar la eliminación del proceso");
         }
-        procesoService.eliminarProceso(id, sesionActual.obtener(session));
+        procesoService.eliminarProceso(id, sesionActual.obtener());
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/historial")
     @Operation(summary = "Consultar el historial de cambios de un proceso")
-    public ResponseEntity<List<HistorialProcesoDTO>> historial(@PathVariable Long id, HttpSession session) {
-        return ResponseEntity.ok(procesoService.obtenerHistorial(id, sesionActual.obtener(session)));
+    public ResponseEntity<List<HistorialProcesoDTO>> historial(@PathVariable Long id) {
+        return ResponseEntity.ok(procesoService.obtenerHistorial(id, sesionActual.obtener()));
     }
 }

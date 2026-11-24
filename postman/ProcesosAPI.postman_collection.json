@@ -1,13 +1,17 @@
 {
   "info": {
     "name": "Editor de procesos - API REST",
-    "description": "Recorre la API completa en orden: registra una empresa, inicia sesión y modela el proceso de solicitud de vacaciones del enunciado. Ejecútela con el Collection Runner (en orden). Postman conserva la cookie JSESSIONID entre peticiones.",
+    "description": "Recorre la API completa en orden: registra una empresa, inicia sesión (JWT) y modela el proceso de solicitud de vacaciones del enunciado. Ejecútela con el Collection Runner (en orden). El login guarda el token en la variable {{token}} y la colección lo envía en Authorization: Bearer.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
     }
   ],
   "item": [
@@ -38,6 +42,9 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nombre\": \"Empresa Demo {{sufijo}}\",\n  \"nit\": \"900{{sufijo}}\",\n  \"correoContacto\": \"contacto{{sufijo}}@demo.com\",\n  \"adminNombre\": \"Ana Administradora\",\n  \"adminCorreo\": \"admin{{sufijo}}@demo.com\",\n  \"adminPassword\": \"Clave12345\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           },
           "event": [
@@ -86,6 +93,9 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nombre\": \"Otra\",\n  \"nit\": \"900{{sufijo}}\",\n  \"correoContacto\": \"otra{{sufijo}}@demo.com\",\n  \"adminNombre\": \"Otro\",\n  \"adminCorreo\": \"otro{{sufijo}}@demo.com\",\n  \"adminPassword\": \"Clave12345\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           },
           "event": [
@@ -125,6 +135,9 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"correo\": \"admin{{sufijo}}@demo.com\",\n  \"password\": \"incorrecta\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           },
           "event": [
@@ -164,6 +177,9 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"correo\": \"admin{{sufijo}}@demo.com\",\n  \"password\": \"Clave12345\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           },
           "event": [
@@ -173,8 +189,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Responde 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Rol administrador', () => pm.expect(pm.response.json().rol).to.eql('ADMINISTRADOR'));",
-                  "pm.collectionVariables.set('empresaId', pm.response.json().empresaId);"
+                  "pm.test('Rol administrador', () => pm.expect(pm.response.json().usuario.rol).to.eql('ADMINISTRADOR'));",
+                  "pm.collectionVariables.set('empresaId', pm.response.json().usuario.empresaId);",
+                  "pm.collectionVariables.set('token', pm.response.json().token);",
+                  "pm.test('Devuelve un JWT', () => pm.expect(pm.response.json().tipo).to.eql('Bearer'));"
                 ]
               }
             }
@@ -1324,10 +1342,10 @@
       ]
     },
     {
-      "name": "8. Cierre de sesión",
+      "name": "8. Seguridad: cierre de sesión y tokens inválidos",
       "item": [
         {
-          "name": "Logout",
+          "name": "Logout (la API es sin estado: responde 204)",
           "request": {
             "method": "POST",
             "header": [],
@@ -1356,10 +1374,49 @@
           ]
         },
         {
-          "name": "Sin sesión no hay acceso",
+          "name": "Sin token no hay acceso",
           "request": {
             "method": "GET",
             "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/procesos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "procesos"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token falso responde 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer abc.def.ghi"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
             "url": {
               "raw": "{{baseUrl}}/api/procesos",
               "host": [
@@ -1377,7 +1434,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Token inválido', () => pm.expect(pm.response.json().mensaje).to.include('Token'));"
                 ]
               }
             }
@@ -1385,5 +1443,15 @@
         }
       ]
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

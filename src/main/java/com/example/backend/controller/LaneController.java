@@ -24,7 +24,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -44,9 +43,8 @@ public class LaneController {
     @Operation(summary = "Listar las lanes del pool en orden")
     public ResponseEntity<List<LaneDTO>> listar(
             @PathVariable Long procesoId,
-            @PathVariable Long poolId,
-            HttpSession session) {
-        return ResponseEntity.ok(laneService.listarPorPool(procesoId, poolId, sesionActual.obtener(session)));
+            @PathVariable Long poolId) {
+        return ResponseEntity.ok(laneService.listarPorPool(procesoId, poolId, sesionActual.obtener()));
     }
 
     @PostMapping
@@ -54,10 +52,9 @@ public class LaneController {
     public ResponseEntity<LaneDTO> crear(
             @PathVariable Long procesoId,
             @PathVariable Long poolId,
-            @Valid @RequestBody LaneRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody LaneRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(laneService.crearLane(procesoId, poolId, request, sesionActual.obtener(session)));
+                .body(laneService.crearLane(procesoId, poolId, request, sesionActual.obtener()));
     }
 
     @PutMapping("/orden")
@@ -65,9 +62,8 @@ public class LaneController {
     public ResponseEntity<List<LaneDTO>> reordenar(
             @PathVariable Long procesoId,
             @PathVariable Long poolId,
-            @Valid @RequestBody ReordenarLanesRequestDTO request,
-            HttpSession session) {
-        return ResponseEntity.ok(laneService.reordenarLanes(procesoId, poolId, request, sesionActual.obtener(session)));
+            @Valid @RequestBody ReordenarLanesRequestDTO request) {
+        return ResponseEntity.ok(laneService.reordenarLanes(procesoId, poolId, request, sesionActual.obtener()));
     }
 
     @PutMapping("/{laneId}")
@@ -76,9 +72,8 @@ public class LaneController {
             @PathVariable Long procesoId,
             @PathVariable Long poolId,
             @PathVariable Long laneId,
-            @Valid @RequestBody LaneRequestDTO request,
-            HttpSession session) {
-        return ResponseEntity.ok(laneService.editarLane(procesoId, poolId, laneId, request, sesionActual.obtener(session)));
+            @Valid @RequestBody LaneRequestDTO request) {
+        return ResponseEntity.ok(laneService.editarLane(procesoId, poolId, laneId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{laneId}")
@@ -87,11 +82,10 @@ public class LaneController {
             @PathVariable Long procesoId,
             @PathVariable Long poolId,
             @PathVariable Long laneId,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         if (!confirmar) {
             throw new OperacionInvalidaException("Debe confirmar la eliminación de la lane");
         }
-        return ResponseEntity.ok(laneService.eliminarLane(procesoId, poolId, laneId, sesionActual.obtener(session)));
+        return ResponseEntity.ok(laneService.eliminarLane(procesoId, poolId, laneId, sesionActual.obtener()));
     }
 }

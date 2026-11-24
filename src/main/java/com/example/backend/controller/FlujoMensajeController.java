@@ -23,7 +23,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -41,18 +40,17 @@ public class FlujoMensajeController {
 
     @GetMapping
     @Operation(summary = "Listar los flujos de mensaje del proceso")
-    public ResponseEntity<List<FlujoMensajeResponseDTO>> listar(@PathVariable Long procesoId, HttpSession session) {
-        return ResponseEntity.ok(flujoService.listarPorProceso(procesoId, sesionActual.obtener(session)));
+    public ResponseEntity<List<FlujoMensajeResponseDTO>> listar(@PathVariable Long procesoId) {
+        return ResponseEntity.ok(flujoService.listarPorProceso(procesoId, sesionActual.obtener()));
     }
 
     @PostMapping
     @Operation(summary = "Crear un flujo de mensaje desde un Message Throw")
     public ResponseEntity<FlujoMensajeResponseDTO> crear(
             @PathVariable Long procesoId,
-            @Valid @RequestBody FlujoMensajeRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody FlujoMensajeRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(flujoService.crearFlujo(procesoId, request, sesionActual.obtener(session)));
+                .body(flujoService.crearFlujo(procesoId, request, sesionActual.obtener()));
     }
 
     @PutMapping("/{flujoId}")
@@ -60,9 +58,8 @@ public class FlujoMensajeController {
     public ResponseEntity<FlujoMensajeResponseDTO> editar(
             @PathVariable Long procesoId,
             @PathVariable Long flujoId,
-            @Valid @RequestBody FlujoMensajeRequestDTO request,
-            HttpSession session) {
-        return ResponseEntity.ok(flujoService.editarFlujo(procesoId, flujoId, request, sesionActual.obtener(session)));
+            @Valid @RequestBody FlujoMensajeRequestDTO request) {
+        return ResponseEntity.ok(flujoService.editarFlujo(procesoId, flujoId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{flujoId}")
@@ -70,11 +67,10 @@ public class FlujoMensajeController {
     public ResponseEntity<EliminacionFlujoMensajeResponseDTO> eliminar(
             @PathVariable Long procesoId,
             @PathVariable Long flujoId,
-            @RequestParam(defaultValue = "false") boolean confirmar,
-            HttpSession session) {
+            @RequestParam(defaultValue = "false") boolean confirmar) {
         if (!confirmar) {
             throw new OperacionInvalidaException("Debe confirmar la eliminación del flujo de mensaje");
         }
-        return ResponseEntity.ok(flujoService.eliminarFlujo(procesoId, flujoId, sesionActual.obtener(session)));
+        return ResponseEntity.ok(flujoService.eliminarFlujo(procesoId, flujoId, sesionActual.obtener()));
     }
 }

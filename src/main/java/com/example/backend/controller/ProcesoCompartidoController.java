@@ -19,7 +19,6 @@ import com.example.backend.sesion.SesionActual;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
@@ -37,35 +36,32 @@ public class ProcesoCompartidoController {
 
     @GetMapping("/compartidos-conmigo")
     @Operation(summary = "Procesos de otras empresas compartidos con la mía")
-    public ResponseEntity<List<ProcesoCompartidoResponseDTO>> compartidosConmigo(HttpSession session) {
-        return ResponseEntity.ok(procesoCompartidoService.listarCompartidosConmigo(sesionActual.obtener(session)));
+    public ResponseEntity<List<ProcesoCompartidoResponseDTO>> compartidosConmigo() {
+        return ResponseEntity.ok(procesoCompartidoService.listarCompartidosConmigo(sesionActual.obtener()));
     }
 
     @GetMapping("/{procesoId}/comparticiones")
     @Operation(summary = "Empresas con las que está compartido un proceso propio")
     public ResponseEntity<List<ProcesoCompartidoResponseDTO>> listar(
-            @PathVariable Long procesoId,
-            HttpSession session) {
-        return ResponseEntity.ok(procesoCompartidoService.listarComparticiones(procesoId, sesionActual.obtener(session)));
+            @PathVariable Long procesoId) {
+        return ResponseEntity.ok(procesoCompartidoService.listarComparticiones(procesoId, sesionActual.obtener()));
     }
 
     @PostMapping("/{procesoId}/comparticiones")
     @Operation(summary = "Compartir un proceso con otra empresa (solo administrador)")
     public ResponseEntity<ProcesoCompartidoResponseDTO> compartir(
             @PathVariable Long procesoId,
-            @Valid @RequestBody CompartirProcesoRequestDTO request,
-            HttpSession session) {
+            @Valid @RequestBody CompartirProcesoRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(procesoCompartidoService.compartir(procesoId, request, sesionActual.obtener(session)));
+                .body(procesoCompartidoService.compartir(procesoId, request, sesionActual.obtener()));
     }
 
     @DeleteMapping("/{procesoId}/comparticiones/{empresaDestinoId}")
     @Operation(summary = "Dejar de compartir un proceso con una empresa")
     public ResponseEntity<Void> dejarDeCompartir(
             @PathVariable Long procesoId,
-            @PathVariable Long empresaDestinoId,
-            HttpSession session) {
-        procesoCompartidoService.dejarDeCompartir(procesoId, empresaDestinoId, sesionActual.obtener(session));
+            @PathVariable Long empresaDestinoId) {
+        procesoCompartidoService.dejarDeCompartir(procesoId, empresaDestinoId, sesionActual.obtener());
         return ResponseEntity.noContent().build();
     }
 }

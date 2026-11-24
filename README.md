@@ -30,7 +30,7 @@ Compose levanta tres contenedores:
 
 - `db`: PostgreSQL 17, con *healthcheck* y volumen `datos-postgres`.
 - `backend`: imagen multi-etapa. Maven compila y la imagen final usa JRE 17 Alpine con un usuario sin privilegios. Arranca solo cuando la base está sana.
-- `frontend`: compila Angular y lo sirve con nginx. nginx reenvía `/api` al backend, así el navegador ve un único origen: no hace falta CORS y la cookie de sesión funciona sin configuración extra.
+- `frontend`: compila Angular y lo sirve con nginx. nginx reenvía `/api` al backend, así el navegador ve un único origen y no hace falta CORS.
 
 Comandos útiles:
 
@@ -64,12 +64,13 @@ controller  →  service (interfaz + impl)  →  repository  →  entity
 
 | Paquete | Responsabilidad |
 | --- | --- |
-| `controller` | Solo HTTP: recibe el DTO, obtiene la sesión, delega al servicio y elige el código de estado. Documentado con `@Tag` y `@Operation`. |
+| `controller` | Solo HTTP: recibe el DTO, obtiene el usuario autenticado, delega al servicio y elige el código de estado. Documentado con `@Tag` y `@Operation`. |
 | `service` | Reglas de negocio de cada historia de usuario. Interfaz + implementación. `@Transactional(readOnly = true)` a nivel de clase y `@Transactional` en las escrituras. |
 | `mapper` | Conversión entidad → DTO en componentes Spring. Las entidades nunca salen del backend. |
 | `dto` | Contratos de entrada (con Bean Validation) y de salida de la API. |
 | `repository` | Spring Data JPA. Las consultas agregadas devuelven DTO mediante proyecciones (`SELECT new ...DTO(...)`), no `Object[]` ni mapas. |
-| `sesion` | `SesionActual` guarda en la sesión HTTP solo el id del usuario. En cada petición recarga rol y empresa desde la base, así un cambio de rol o una desactivación aplica de inmediato. |
+| `seguridad` | Spring Security y JWT: filtro, servicio de tokens y respuestas 401/403 (ver *Seguridad*). |
+| `sesion` | `SesionActual` entrega el usuario autenticado del `SecurityContext` (rol y empresa leídos de la base en cada petición). |
 | `exception` | Excepciones de dominio y `GlobalExceptionHandler`. |
 | `config` | Configuración de OpenAPI. |
 
@@ -90,43 +91,49 @@ Servicios transversales que evitan código repetido:
   - Ejemplo: `ProcesoServiceImpl` pasó de 12 repositorios a 3.
 - Los controladores ya no tienen lógica: no leen atributos sueltos de la sesión ni arman respuestas a mano.
 
-## Autenticación con JWT
+## Seguridad: Spring Security + JWT
 
-La API acepta un token JWT en el encabezado `Authorization`. El token se genera y se valida con la librería [JJWT](https://github.com/jwtk/jjwt) 0.12.6 (firma HMAC-SHA256).
+La API es **sin estado** (`SessionCreationPolicy.STATELESS`): no hay sesión HTTP y cada petición trae su token JWT. El token se genera y se valida con la librería [JJWT](https://github.com/jwtk/jjwt) 0.12.6 (firma HMAC-SHA256).
 
-1. `POST /api/auth/token` con `{"correo": "...", "password": "..."}` devuelve `{token, tipo: "Bearer", expiraEnSegundos, usuario}`.
-2. En cada petición se envía `Authorization: Bearer <token>`.
-3. Si el token falta, fue alterado o venció, la API responde 401.
+```
+POST /api/auth/login ──► AuthService valida correo y contraseña (BCrypt) ──► JwtService.generar ──► {token}
+
+Petición con "Authorization: Bearer <token>"
+  ──► JwtAuthenticationFilter: JwtService.validar (firma y vencimiento)
+        ──► carga el usuario de la base (rol y empresa vigentes)
+        ──► SecurityContext con ROLE_ADMINISTRADOR | ROLE_EDITOR | ROLE_LECTURA
+  ──► SecurityConfig: reglas por rol (403 si no alcanza)
+  ──► Servicio: ValidadorAcceso filtra por empresa (aislamiento entre organizaciones)
+```
 
 | Archivo | Responsabilidad |
 | --- | --- |
+| `config/SecurityConfig` | `SecurityFilterChain`: rutas públicas, reglas por rol, API sin estado, respuestas 401/403. |
+| `seguridad/JwtAuthenticationFilter` | Filtro de Spring Security que valida el token y autentica la petición. |
 | `seguridad/JwtService` | Genera y valida el token con JJWT (`Jwts.builder()` y `Jwts.parser()`). |
-| `sesion/SesionActual` | Lee el token de la petición; si no hay token, usa la sesión HTTP. |
-| `controller/AuthController` | Endpoint `POST /api/auth/token`. |
+| `seguridad/RespuestaErrorSeguridad` | Escribe los 401/403 con el formato `{mensaje, errores}`. |
+| `sesion/SesionActual` | Entrega a los controladores el usuario autenticado del `SecurityContext`. |
+| `service/ValidadorAcceso` | Reglas de negocio: proceso de la empresa, activo, permisos de edición. |
 
-El token solo guarda el id del usuario (`sub`), la emisión (`iat`) y el vencimiento (`exp`); el rol y la empresa se consultan en la base de datos en cada petición.
-Configuración: `JWT_SECRET` (mínimo 32 caracteres) y `JWT_EXPIRACION_MINUTOS` (60 por defecto).
-En Swagger: ejecute `/api/auth/token`, pulse **Authorize** y pegue el token.
+| Endpoint | Acceso | Función |
+| --- | --- | --- |
+| `POST /api/auth/login` | Público | Devuelve `{token, tipo: "Bearer", expiraEnSegundos, usuario}`. |
+| `POST /api/empresas/registro` | Público | Registra la empresa y su administrador. |
+| `GET /api/auth/sesion` | Autenticado | Usuario dueño del token. |
+| `POST /api/auth/logout` | Autenticado | 204; el cliente descarta su token. |
 
-## Seguridad y sesión
-
-- Contraseñas con BCrypt.
-- Login con un mensaje genérico ante credenciales incorrectas.
-- Cookie `JSESSIONID` `HttpOnly` y `SameSite=Lax`. Al iniciar sesión se invalida la sesión anterior para evitar *session fixation*.
-
-| Endpoint | Función |
+| Rol | Permisos (además de consultar) |
 | --- | --- |
-| `POST /api/auth/login` | Inicia sesión. |
-| `GET /api/auth/sesion` | Devuelve el usuario actual. |
-| `POST /api/auth/logout` | Cierra la sesión (204). |
-
-| Rol | Permisos |
-| --- | --- |
-| `ADMINISTRADOR` | Todo, incluidos usuarios, roles de proceso y eliminación de procesos. |
-| `EDITOR` | Modela procesos. |
+| `ADMINISTRADOR` | Gestiona usuarios y roles de proceso, elimina y comparte procesos, y todo lo del editor. |
+| `EDITOR` | Crea y edita procesos y modela su diagrama. |
 | `LECTURA` | Solo consulta. |
 
-Los procesos compartidos por otra empresa son de solo lectura (HU-23).
+Los procesos compartidos por otra empresa son de solo lectura (HU-23). Un proceso de otra empresa no compartido responde 404.
+
+- El token solo guarda `sub` (id del usuario), `iat` y `exp`; el rol y la empresa se leen de la base en cada petición, así un cambio de rol o una desactivación aplica de inmediato.
+- Contraseñas con BCrypt y mensaje genérico ante credenciales incorrectas.
+- Configuración: `JWT_SECRET` (mínimo 32 caracteres) y `JWT_EXPIRACION_MINUTOS` (60 por defecto).
+- En Swagger: ejecute `POST /api/auth/login`, pulse **Authorize** y pegue el token.
 
 ## Convenciones de la API
 
@@ -142,7 +149,7 @@ Los procesos compartidos por otra empresa son de solo lectura (HU-23).
   | Código | Cuándo |
   | --- | --- |
   | 400 | Validación u operación inválida |
-  | 401 | Sin sesión |
+  | 401 | Sin token, token inválido o vencido |
   | 403 | Sin permiso |
   | 404 | No existe |
   | 409 | Duplicado |
@@ -171,4 +178,11 @@ Los procesos compartidos por otra empresa son de solo lectura (HU-23).
 ./mvnw test
 ```
 
-`contextLoads` necesita una base PostgreSQL disponible, por ejemplo `docker compose up db`.
+No necesitan PostgreSQL: usan una base H2 en memoria (`src/test/resources/application.properties`).
+
+`SeguridadApiIntegrationTest` levanta la aplicación completa en un puerto aleatorio y la consume por HTTP (17 casos):
+
+- **Autenticación:** registro público, login correcto e incorrecto, sin token, token falso y token alterado (401).
+- **Casos de uso:** crear, listar y consultar procesos; historial con su autor.
+- **Autorización por rol:** EDITOR crea procesos; LECTURA no crea (403) pero sí consulta; EDITOR no gestiona usuarios ni elimina procesos (403).
+- **Aislamiento entre empresas:** una empresa no ve los procesos de otra (404), no gestiona sus usuarios (403), y un proceso compartido se ve pero no se edita.

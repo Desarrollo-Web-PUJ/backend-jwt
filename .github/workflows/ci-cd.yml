@@ -3,9 +3,13 @@
 #  1. pruebas     (GitHub, Ubuntu): compila y corre las pruebas unitarias y de
 #                 integración (Spring Security, 401/403, aislamiento entre
 #                 empresas) con Maven. No necesita PostgreSQL: usa H2.
-#  2. imagen      (GitHub, Ubuntu): construye la imagen Docker del backend.
+#     web         (GitHub, Ubuntu): compila y prueba la aplicacion Thymeleaf
+#                 (carpeta web-thymeleaf), en paralelo con el backend.
+#  2. imagen      (GitHub, Ubuntu): construye las imagenes Docker del backend y
+#                 de la aplicacion Thymeleaf.
 #  3. despliegue  (runner propio del equipo, "self-hosted"): descarga backend y
-#                 frontend y levanta todo con Docker Compose.
+#                 frontend y levanta con Docker Compose los componentes por
+#                 separado: base de datos, backend, frontend y web Thymeleaf.
 #
 # El despliegue solo corre en un push a main y si la variable del repositorio
 # DESPLIEGUE_HABILITADO vale "true" (Settings > Secrets and variables > Actions
@@ -51,16 +55,42 @@ jobs:
           name: reporte-pruebas-backend
           path: target/surefire-reports/
 
+  web:
+    name: Compilar y probar la web Thymeleaf
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-thymeleaf
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: web-thymeleaf/pom.xml
+
+      - name: Compilar y correr las pruebas
+        run: |
+          chmod +x mvnw
+          ./mvnw -B verify
+
   imagen:
-    name: Construir imagen Docker
-    needs: pruebas
+    name: Construir imágenes Docker
+    needs: [pruebas, web]
     runs-on: ubuntu-latest
     steps:
       - name: Descargar el código
         uses: actions/checkout@v4
 
-      - name: Construir la imagen
+      - name: Construir la imagen del backend
         run: docker build -t procesos-backend:${{ github.sha }} .
+
+      - name: Construir la imagen de la web Thymeleaf
+        run: docker build -t procesos-web:${{ github.sha }} web-thymeleaf
 
   despliegue:
     name: Desplegar con Docker Compose
@@ -94,6 +124,7 @@ jobs:
             "JWT_EXPIRACION_MINUTOS=60",
             "FRONTEND_PORT=4200",
             "BACKEND_PORT=8080",
+            "WEB_PORT=8090",
             "DB_PORT=5433"
           ) | Set-Content -Path .env -Encoding utf8
 
@@ -109,7 +140,8 @@ jobs:
             try {
               $api = Invoke-WebRequest -Uri http://localhost:8080/v3/api-docs -UseBasicParsing
               $web = Invoke-WebRequest -Uri http://localhost:4200/ -UseBasicParsing
-              if ($api.StatusCode -eq 200 -and $web.StatusCode -eq 200) { Write-Host "Despliegue verificado"; exit 0 }
+              $thy = Invoke-WebRequest -Uri http://localhost:8090/login -UseBasicParsing
+              if ($api.StatusCode -eq 200 -and $web.StatusCode -eq 200 -and $thy.StatusCode -eq 200) { Write-Host "Despliegue verificado"; exit 0 }
             } catch { }
             Start-Sleep -Seconds 10
           }

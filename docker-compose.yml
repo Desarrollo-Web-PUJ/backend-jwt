@@ -1,4 +1,6 @@
-# Levanta el sistema completo: PostgreSQL + backend (Spring Boot) + frontend (Angular + nginx).
+# Levanta el sistema completo en contenedores separados:
+#   db (PostgreSQL) + backend (API REST, Spring Boot) + frontend (Angular + nginx)
+#   + web (aplicacion Thymeleaf que consume la API con JWT).
 #
 # Requisitos: los repositorios "backend" y "frontend" clonados en la misma carpeta:
 #   carpeta/
@@ -11,6 +13,7 @@
 #
 #   Aplicación:  http://localhost:4200
 #   Swagger UI:  http://localhost:8080/swagger-ui.html
+#   Web Thymeleaf: http://localhost:8090
 
 services:
 
@@ -58,6 +61,18 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-4200}:80"
+
+  web:
+    build:
+      context: ./web-thymeleaf
+    container_name: procesos-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      BACKEND_URL: http://backend:8080
+    ports:
+      - "${WEB_PORT:-8090}:8090"
 
 volumes:
   datos-postgres:

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/base :: cabecera(${proceso.nombre})}"></head>
+<body>
+<header th:replace="~{fragmentos/base :: navegacion}"></header>
+<main class="contenido">
+    <a th:href="@{/procesos}" class="enlace">← Volver a procesos</a>
+
+    <div th:if="${mensaje}" class="aviso exito" th:text="${mensaje}">Mensaje</div>
+
+    <div class="titulo-acciones">
+        <div>
+            <h1 th:text="${proceso.nombre}">Proceso</h1>
+            <p class="suave">
+                <span th:text="${proceso.categoria}">Categoría</span> ·
+                <span class="estado" th:classappend="${proceso.estado == 'PUBLICADO'} ? 'publicado' : 'borrador'" th:text="${proceso.estado}">BORRADOR</span>
+                <span th:unless="${propio}" class="estado compartido">Compartido · solo lectura</span>
+            </p>
+        </div>
+    </div>
+    <p th:if="${!#strings.isEmpty(proceso.descripcion)}" th:text="${proceso.descripcion}">Descripción</p>
+
+    <h2>Resumen del diagrama</h2>
+    <div class="resumen">
+        <div><strong th:text="${#lists.size(proceso.pools)}">0</strong><span>Pools</span></div>
+        <div><strong th:text="${#lists.size(proceso.lanes)}">0</strong><span>Lanes</span></div>
+        <div><strong th:text="${#lists.size(proceso.actividades)}">0</strong><span>Actividades</span></div>
+        <div><strong th:text="${#lists.size(proceso.gateways)}">0</strong><span>Gateways</span></div>
+        <div><strong th:text="${#lists.size(proceso.arcos)}">0</strong><span>Arcos</span></div>
+        <div><strong th:text="${#lists.size(proceso.eventosMensaje)}">0</strong><span>Eventos de mensaje</span></div>
+    </div>
+
+    <div class="columnas">
+        <section>
+            <h2>Pools y lanes</h2>
+            <p th:if="${#lists.isEmpty(proceso.pools)}" class="vacio">Sin pools.</p>
+            <ul class="lista">
+                <li th:each="pool : ${proceso.pools}"><strong th:text="${pool.nombre}">Pool</strong> <span class="suave" th:text="${pool.tipo}">PROPIO</span></li>
+                <li th:each="lane : ${proceso.lanes}">Lane: <span th:text="${lane.nombre}">Lane</span></li>
+            </ul>
+        </section>
+        <section>
+            <h2>Actividades</h2>
+            <p th:if="${#lists.isEmpty(proceso.actividades)}" class="vacio">Sin actividades.</p>
+            <ul class="lista">
+                <li th:each="a : ${proceso.actividades}">
+                    <strong th:text="${a.nombre}">Actividad</strong>
+                    <span class="suave" th:text="${a.tipo + (a.laneNombre != null ? ' · ' + a.laneNombre : '')}">TAREA</span>
+                </li>
+            </ul>
+        </section>
+    </div>
+
+    <section th:if="${propio}">
+        <h2>Historial de cambios</h2>
+        <p th:if="${#lists.isEmpty(historial)}" class="vacio">Sin cambios registrados.</p>
+        <table th:unless="${#lists.isEmpty(historial)}" class="tabla">
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>Cambio</th></tr></thead>
+            <tbody>
+            <tr th:each="h : ${historial}">
+                <td th:text="${h.fechaLegible()}">Fecha</td>
+                <td th:text="${h.usuario}">Usuario</td>
+                <td th:text="${h.descripcion}">Cambio</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <p class="suave pie">El diagrama se edita en la aplicación Angular; esta vista web es de consulta.</p>
+</main>
+</body>
+</html>

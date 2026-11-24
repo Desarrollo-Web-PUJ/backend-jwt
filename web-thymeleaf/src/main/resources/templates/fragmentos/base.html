@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="cabecera(titulo)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${titulo} + ' · Editor de Procesos'">Editor de Procesos</title>
+    <link rel="stylesheet" th:href="@{/css/estilos.css}">
+</head>
+<body>
+<header th:fragment="navegacion" class="barra">
+    <a class="marca" th:href="@{/procesos}">Editor de Procesos <span class="etiqueta">Thymeleaf</span></a>
+    <nav th:if="${usuario != null}">
+        <span class="quien">
+            <strong th:text="${usuario.nombre}">Usuario</strong>
+            · <span th:text="${usuario.rol}">ROL</span>
+            · Empresa #<span th:text="${usuario.empresaId}">1</span>
+        </span>
+        <form th:action="@{/logout}" method="post" class="en-linea">
+            <button type="submit" class="boton secundario">Cerrar sesión</button>
+        </form>
+    </nav>
+</header>
+</body>
+</html>

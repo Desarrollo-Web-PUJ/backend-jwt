@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/base :: cabecera('Error')}"></head>
+<body>
+<header th:replace="~{fragmentos/base :: navegacion}"></header>
+<main class="contenido estrecho">
+    <h1 th:switch="${estado}">
+        <span th:case="403">No tienes permiso</span>
+        <span th:case="404">No encontrado</span>
+        <span th:case="*">Ocurrió un error</span>
+    </h1>
+    <div class="aviso error" th:text="${mensaje}">Mensaje de la API</div>
+    <a th:href="@{/procesos}" class="boton secundario">Volver a procesos</a>
+</main>
+</body>
+</html>

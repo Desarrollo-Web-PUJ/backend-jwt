@@ -22,15 +22,17 @@ docker compose up --build
 | Servicio | URL |
 | --- | --- |
 | Aplicación (Angular + nginx) | http://localhost:4200 |
+| Web Thymeleaf | http://localhost:8090 |
 | API | http://localhost:8080/api |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | OpenAPI (JSON) | http://localhost:8080/v3/api-docs |
 
-Compose levanta tres contenedores:
+Compose levanta cuatro contenedores, cada uno desplegado por separado:
 
 - `db`: PostgreSQL 17, con *healthcheck* y volumen `datos-postgres`.
 - `backend`: imagen multi-etapa. Maven compila y la imagen final usa JRE 17 Alpine con un usuario sin privilegios. Arranca solo cuando la base está sana.
 - `frontend`: compila Angular y lo sirve con nginx. nginx reenvía `/api` al backend, así el navegador ve un único origen y no hace falta CORS.
+- `web`: aplicación web con vistas **Thymeleaf** (carpeta `web-thymeleaf/`). No tiene base de datos: consume la API con JWT, igual que Angular.
 
 Comandos útiles:
 
@@ -54,6 +56,22 @@ La configuración se lee de variables de entorno, con valores por defecto para d
 | `JPA_DDL_AUTO` | `update` |
 | `JPA_SHOW_SQL` | `false` |
 
+## Web Thymeleaf (`web-thymeleaf/`)
+
+Tercer componente desplegable: una aplicación Spring Boot con vistas **Thymeleaf** renderizadas en el servidor. No tiene base de datos propia: consume la misma API REST con JWT.
+
+| Ruta | Vista |
+| --- | --- |
+| `/login` | Inicio de sesión contra `POST /api/auth/login`. |
+| `/procesos` | Listado con búsqueda y paginación. |
+| `/procesos/nuevo` | Crear proceso (administrador y editor), con validación del formulario. |
+| `/procesos/{id}` | Detalle: resumen del diagrama, pools, lanes, actividades e historial. |
+
+- El JWT se guarda **en la sesión del servidor** de esta aplicación: el navegador solo recibe una cookie `HttpOnly` y nunca ve el token.
+- `ApiCliente` (con `RestClient`) envía `Authorization: Bearer <token>` y traduce los 401 (sesión vencida → login) y los 403/404 (página de error con el mensaje de la API).
+- Ejecutar sin Docker: `cd web-thymeleaf && ./mvnw spring-boot:run` (con el backend en el puerto 8080). Variable `BACKEND_URL` para otra dirección.
+- Pruebas: `./mvnw test` (cliente de la API con un servidor simulado y arranque de la aplicación).
+
 ## CI/CD con GitHub Actions
 
 Cada repositorio tiene su pipeline en `.github/workflows/ci-cd.yml`, que corre en cada push y pull request a `main`:
@@ -61,10 +79,11 @@ Cada repositorio tiene su pipeline en `.github/workflows/ci-cd.yml`, que corre e
 | Etapa | Dónde corre | Qué hace |
 | --- | --- | --- |
 | `pruebas` | GitHub (Ubuntu) | `./mvnw -B verify`: compila y corre las pruebas unitarias y de integración (con H2). Guarda el reporte. |
-| `imagen` | GitHub (Ubuntu) | Construye la imagen Docker del backend. |
+| `web` | GitHub (Ubuntu) | Compila y prueba la web Thymeleaf, en paralelo. |
+| `imagen` | GitHub (Ubuntu) | Construye las imágenes Docker del backend y de la web Thymeleaf. |
 | `despliegue` | Runner propio (`self-hosted`) | Descarga backend y frontend, crea el `.env` con los secretos y ejecuta `docker compose up -d --build`. Verifica que la API y el frontend respondan. |
 
-El despliegue se despliega en **tres componentes por separado** (base de datos, backend y frontend), cada uno en su propio contenedor.
+El sistema se despliega en **componentes separados**, cada uno con su propio contenedor e imagen: base de datos, backend (API REST), frontend (Angular) y web Thymeleaf.
 
 Para activar el despliegue automático:
 1. Registrar un runner propio en el equipo que hará de servidor: *Settings → Actions → Runners → New self-hosted runner* (requiere Docker).

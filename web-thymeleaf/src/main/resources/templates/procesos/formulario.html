@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/base :: cabecera('Crear proceso')}"></head>
+<body>
+<header th:replace="~{fragmentos/base :: navegacion}"></header>
+<main class="contenido estrecho">
+    <a th:href="@{/procesos}" class="enlace">← Volver a procesos</a>
+    <h1>Crear proceso</h1>
+    <p class="suave">El proceso se crea en estado borrador, con el pool de tu empresa.</p>
+
+    <div th:if="${error}" class="aviso error" th:text="${error}">Error</div>
+
+    <form th:action="@{/procesos}" th:object="${formulario}" method="post" class="formulario tarjeta">
+        <label for="nombre">Nombre *</label>
+        <input id="nombre" th:field="*{nombre}" maxlength="150">
+        <small class="error-campo" th:if="${#fields.hasErrors('nombre')}" th:errors="*{nombre}">Error</small>
+
+        <label for="categoria">Categoría *</label>
+        <input id="categoria" th:field="*{categoria}" maxlength="100">
+        <small class="error-campo" th:if="${#fields.hasErrors('categoria')}" th:errors="*{categoria}">Error</small>
+
+        <label for="descripcion">Descripción</label>
+        <textarea id="descripcion" th:field="*{descripcion}" rows="4" maxlength="500"></textarea>
+        <small class="error-campo" th:if="${#fields.hasErrors('descripcion')}" th:errors="*{descripcion}">Error</small>
+
+        <button type="submit" class="boton">Crear proceso</button>
+    </form>
+</main>
+</body>
+</html>

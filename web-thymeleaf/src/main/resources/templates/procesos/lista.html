@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/base :: cabecera('Procesos')}"></head>
+<body>
+<header th:replace="~{fragmentos/base :: navegacion}"></header>
+<main class="contenido">
+    <div class="titulo-acciones">
+        <div>
+            <h1>Procesos</h1>
+            <p class="suave">Procesos de tu empresa, consultados en la API REST con tu token.</p>
+        </div>
+        <a th:if="${usuario != null and usuario.puedeEditar()}" th:href="@{/procesos/nuevo}" class="boton">Crear proceso</a>
+    </div>
+
+    <form th:action="@{/procesos}" method="get" class="busqueda">
+        <input name="nombre" th:value="${nombre}" placeholder="Buscar por nombre" aria-label="Buscar por nombre">
+        <button type="submit" class="boton secundario">Buscar</button>
+        <a th:if="${!#strings.isEmpty(nombre)}" th:href="@{/procesos}" class="enlace">Limpiar</a>
+    </form>
+
+    <p th:if="${pagina.content.isEmpty()}" class="vacio">No se encontraron procesos.</p>
+
+    <table th:unless="${pagina.content.isEmpty()}" class="tabla">
+        <thead>
+        <tr><th>Nombre</th><th>Categoría</th><th>Estado</th><th></th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="p : ${pagina.content}">
+            <td th:text="${p.nombre}">Nombre</td>
+            <td th:text="${p.categoria}">Categoría</td>
+            <td><span class="estado" th:classappend="${p.estado == 'PUBLICADO'} ? 'publicado' : 'borrador'" th:text="${p.estado}">BORRADOR</span></td>
+            <td class="derecha"><a th:href="@{/procesos/{id}(id=${p.id})}" class="enlace">Ver detalle</a></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <nav th:if="${pagina.totalPages > 1}" class="paginador" aria-label="Paginación">
+        <a th:unless="${pagina.first}" th:href="@{/procesos(nombre=${nombre}, pagina=${pagina.number - 1})}" class="boton secundario">Anterior</a>
+        <span>Página <strong th:text="${pagina.number + 1}">1</strong> de <span th:text="${pagina.totalPages}">1</span></span>
+        <a th:unless="${pagina.last}" th:href="@{/procesos(nombre=${nombre}, pagina=${pagina.number + 1})}" class="boton secundario">Siguiente</a>
+    </nav>
+    <p class="suave pie" th:text="${pagina.totalElements} + ' proceso(s) en total'">0 procesos</p>
+</main>
+</body>
+</html>

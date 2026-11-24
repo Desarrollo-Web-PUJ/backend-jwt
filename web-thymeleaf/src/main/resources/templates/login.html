@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/base :: cabecera('Iniciar sesión')}"></head>
+<body class="centrado">
+<main class="tarjeta estrecha">
+    <h1>Editor de Procesos</h1>
+    <p class="suave">Versión web con Thymeleaf. Inicia sesión con tu cuenta de la empresa.</p>
+
+    <div th:if="${param.expirada}" class="aviso advertencia">Tu sesión venció. Inicia sesión de nuevo.</div>
+    <div th:if="${param.salida}" class="aviso exito">Cerraste sesión correctamente.</div>
+    <div th:if="${error}" class="aviso error" th:text="${error}">Error</div>
+
+    <form th:action="@{/login}" method="post" class="formulario">
+        <label for="correo">Correo electrónico</label>
+        <input id="correo" name="correo" type="email" required th:value="${correo}" placeholder="ejemplo@empresa.com">
+
+        <label for="password">Contraseña</label>
+        <input id="password" name="password" type="password" required placeholder="Ingresa tu contraseña">
+
+        <button type="submit" class="boton">Iniciar sesión</button>
+    </form>
+</main>
+</body>
+</html>

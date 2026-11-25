@@ -203,7 +203,7 @@ Los procesos compartidos por otra empresa son de solo lectura (HU-23). Un proces
   2. Revise la variable `baseUrl` (por defecto `http://localhost:8080`).
   3. Ejecute la colección completa con *Run collection*, en orden.
 
-  Las 36 peticiones:
+  Las 37 peticiones:
 
   - registran una empresa nueva (con un sufijo único, así se puede repetir);
   - inician sesión y modelan el proceso de solicitud de vacaciones del enunciado;
@@ -213,14 +213,34 @@ Los procesos compartidos por otra empresa son de solo lectura (HU-23). Un proces
 ## Pruebas
 
 ```bash
-./mvnw test
+./mvnw verify          # pruebas + reporte de cobertura en target/site/jacoco/index.html
 ```
 
 No necesitan PostgreSQL: usan una base H2 en memoria (`src/test/resources/application.properties`).
 
-`SeguridadApiIntegrationTest` levanta la aplicación completa en un puerto aleatorio y la consume por HTTP (17 casos):
+**Pruebas unitarias** (JUnit 5 y Mockito, sin Spring ni base de datos):
+
+- `JwtServiceTest`: generación y validación del token, firma de otra clave, token alterado, vencido o vacío, clave corta.
+- `ValidadorAccesoTest`: permisos por rol y aislamiento por empresa con el repositorio simulado.
+- `AuthServiceImplTest`: login correcto, contraseña incorrecta, correo inexistente y usuario desactivado.
+- `ArcoServiceImplTest`: reglas de los arcos (mismo nodo, pools distintos, repetidos, condición obligatoria en gateways exclusivos y prohibida en paralelos, advertencias al eliminar).
+
+**Pruebas de integración** (aplicación completa en un puerto aleatorio, consumida por HTTP):
+
+- `FlujoDiagramaIntegrationTest`: el recorrido completo de modelado (roles, pools, lanes, actividades, gateway, arcos, evento y flujo de mensaje, historial, publicación, compartir y eliminar) y la gestión de usuarios.
+- `SeguridadApiIntegrationTest` (17 casos), centrada en la seguridad:
 
 - **Autenticación:** registro público, login correcto e incorrecto, sin token, token falso y token alterado (401).
 - **Casos de uso:** crear, listar y consultar procesos; historial con su autor.
 - **Autorización por rol:** EDITOR crea procesos; LECTURA no crea (403) pero sí consulta; EDITOR no gestiona usuarios ni elimina procesos (403).
 - **Aislamiento entre empresas:** una empresa no ve los procesos de otra (404), no gestiona sus usuarios (403), y un proceso compartido se ve pero no se edita.
+
+### Análisis con SonarQube
+
+Con un SonarQube local (por ejemplo `docker run -d -p 9000:9000 sonarqube:community`) y un token de análisis:
+
+```bash
+./mvnw clean verify sonar:sonar -Dsonar.host.url=http://localhost:9000 -Dsonar.token=<token> -Dsonar.projectKey=backend-jwt
+```
+
+SonarQube toma la cobertura de `target/site/jacoco/jacoco.xml`.

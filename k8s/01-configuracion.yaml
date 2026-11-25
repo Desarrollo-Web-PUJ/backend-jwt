@@ -1,0 +1,15 @@
+# Configuración no secreta. Las claves (DB_PASSWORD y JWT_SECRET) van en el Secret
+# "procesos-secretos", que se crea con kubectl y nunca se guarda en el repositorio:
+#   kubectl -n procesos create secret generic procesos-secretos \
+#     --from-literal=DB_PASSWORD=<clave> --from-literal=JWT_SECRET=<clave de 32 caracteres o más>
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: procesos-config
+  namespace: procesos
+data:
+  DB_NAME: proyecto_db
+  DB_USERNAME: proyecto_user
+  DB_URL: jdbc:postgresql://db:5432/proyecto_db
+  JWT_EXPIRACION_MINUTOS: "60"
+  BACKEND_URL: http://backend:8080

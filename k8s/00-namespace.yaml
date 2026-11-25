@@ -1,0 +1,5 @@
+# Espacio de nombres propio para los cuatro componentes del sistema.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: procesos

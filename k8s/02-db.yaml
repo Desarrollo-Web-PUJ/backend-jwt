@@ -1,0 +1,67 @@
+# PostgreSQL 17 con almacenamiento persistente (PersistentVolumeClaim).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: datos-postgres
+  namespace: procesos
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: procesos
+  labels: {app: db}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: db}
+  template:
+    metadata:
+      labels: {app: db}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom: {configMapKeyRef: {name: procesos-config, key: DB_NAME}}
+            - name: POSTGRES_USER
+              valueFrom: {configMapKeyRef: {name: procesos-config, key: DB_USERNAME}}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: procesos-secretos, key: DB_PASSWORD}}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 512Mi}
+          volumeMounts:
+            - name: datos
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: datos
+          persistentVolumeClaim:
+            claimName: datos-postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: procesos
+spec:
+  selector: {app: db}
+  ports:
+    - port: 5432
+      targetPort: 5432

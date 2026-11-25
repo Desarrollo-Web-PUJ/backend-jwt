@@ -1,0 +1,46 @@
+# Web Thymeleaf (tercer despliegue): llama a la API por el Service "backend".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: procesos
+  labels: {app: web}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: web
+          image: procesos-web:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8090
+          env:
+            - name: BACKEND_URL
+              valueFrom: {configMapKeyRef: {name: procesos-config, key: BACKEND_URL}}
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=60
+          readinessProbe:
+            httpGet: {path: /login, port: 8090}
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {memory: 512Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: procesos
+spec:
+  type: NodePort
+  selector: {app: web}
+  ports:
+    - port: 8090
+      targetPort: 8090
+      nodePort: 30890

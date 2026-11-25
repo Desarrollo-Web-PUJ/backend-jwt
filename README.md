@@ -56,6 +56,33 @@ La configuración se lee de variables de entorno, con valores por defecto para d
 | `JPA_DDL_AUTO` | `update` |
 | `JPA_SHOW_SQL` | `false` |
 
+## Despliegue en Kubernetes (minikube)
+
+Los manifiestos están en `k8s/` (namespace `procesos`): PostgreSQL con un PersistentVolumeClaim, backend, frontend y web Thymeleaf, cada uno con su Deployment, su Service y sondas de disponibilidad. La configuración va en un ConfigMap y las claves en un Secret que se crea a mano (nunca en el repositorio).
+
+```bash
+minikube start --driver=docker --cpus=4 --memory=4096
+
+# Imágenes (se construyen con Docker y se cargan en minikube)
+docker build -t procesos-backend:1.0 .
+docker build -t procesos-web:1.0 web-thymeleaf
+docker build -t procesos-frontend:1.0 ../frontend
+minikube image load procesos-backend:1.0
+minikube image load procesos-web:1.0
+minikube image load procesos-frontend:1.0
+
+kubectl apply -f k8s/00-namespace.yaml
+kubectl -n procesos create secret generic procesos-secretos \
+  --from-literal=DB_PASSWORD=<clave> --from-literal=JWT_SECRET=<clave de 32 caracteres o más>
+kubectl apply -f k8s/
+kubectl -n procesos rollout status deploy/backend
+kubectl -n procesos get pods,svc
+```
+
+Acceso: `minikube service -n procesos frontend` (Angular), `minikube service -n procesos web` (Thymeleaf) y `minikube service -n procesos backend` (API y Swagger), o con `kubectl -n procesos port-forward svc/frontend 4400:80`. Los Services usan NodePort 30420 (frontend), 30890 (web) y 30080 (backend).
+
+Validación: `kubectl -n procesos delete pod -l app=backend` (Kubernetes crea otro pod solo) y `kubectl -n procesos scale deploy/backend --replicas=2` (la API es sin estado). Para borrar todo: `kubectl delete namespace procesos`.
+
 ## Web Thymeleaf (`web-thymeleaf/`)
 
 Tercer componente desplegable: una aplicación Spring Boot con vistas **Thymeleaf** renderizadas en el servidor. No tiene base de datos propia: consume la misma API REST con JWT.
